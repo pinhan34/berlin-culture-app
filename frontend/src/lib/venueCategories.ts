@@ -26,9 +26,9 @@ export const CATEGORY_STYLES: Record<VenueCategory, { bg: string; text: string; 
     label: 'Art & Exhibitions',
   },
   music: {
-    bg: 'bg-violet-50 dark:bg-violet-950/40',
-    text: 'text-violet-700 dark:text-violet-400',
-    border: 'border-violet-200 dark:border-violet-800',
+    bg: 'bg-purple-50 dark:bg-purple-950/40',
+    text: 'text-purple-700 dark:text-purple-400',
+    border: 'border-purple-200 dark:border-purple-800',
     label: 'Music & Nightlife',
   },
   community: {

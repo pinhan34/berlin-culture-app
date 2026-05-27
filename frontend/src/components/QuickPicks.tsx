@@ -53,10 +53,13 @@ export function QuickPicks({ events }: Props) {
       {tonight.length > 0 && (
         <section>
           <div className="mb-3 flex items-center gap-2">
-            <span className="inline-block h-2 w-2 rounded-full bg-rose-500 animate-pulse" />
-            <h2 className="text-sm font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">
-              Tonight
-            </h2>
+            <span className="inline-block h-2 w-2 rounded-full bg-pink-500 animate-pulse dark:bg-pink-400" />
+            <div>
+              <h2 className="text-sm font-bold uppercase tracking-wider text-pink-600 dark:text-pink-400">
+                Tonight
+              </h2>
+              <p className="text-xs text-stone-400 dark:text-stone-500">Still time to make plans</p>
+            </div>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {tonight.map(e => (
@@ -70,8 +73,8 @@ export function QuickPicks({ events }: Props) {
         <section>
           <div className="mb-3 flex items-center gap-2">
             <span className="text-lg">&#9734;</span>
-            <h2 className="text-sm font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
-              This Weekend
+            <h2 className="text-sm font-bold uppercase tracking-wider text-fuchsia-600 dark:text-fuchsia-400">
+              Your weekend lineup
             </h2>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

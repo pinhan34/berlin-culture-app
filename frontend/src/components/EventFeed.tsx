@@ -93,30 +93,30 @@ export function EventFeed({ events, venues }: Props) {
 
       {/* Divider */}
       <div className="flex items-center gap-4">
-        <div className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
-        <span className="text-xs font-semibold uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
-          All Events
+        <div className="h-px flex-1 bg-stone-200 dark:bg-purple-900/40" />
+        <span className="text-xs font-semibold uppercase tracking-widest text-stone-400 dark:text-stone-500">
+          Browse everything
         </span>
-        <div className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
+        <div className="h-px flex-1 bg-stone-200 dark:bg-purple-900/40" />
       </div>
 
       {/* Collapsible filters */}
       <div>
         <button
           onClick={() => setShowFilters(f => !f)}
-          className="mb-3 inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:border-zinc-400 dark:border-zinc-700 dark:text-zinc-400 dark:hover:border-zinc-500"
+          className="mb-3 inline-flex items-center gap-1.5 rounded-lg border border-stone-200 px-3 py-1.5 text-xs font-medium text-stone-600 transition-colors hover:border-stone-400 dark:border-purple-900/40 dark:text-stone-400 dark:hover:border-purple-700/60"
         >
           <svg className={`h-3 w-3 transition-transform ${showFilters ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
           </svg>
-          Filters
+          Filter &amp; explore
           {(selectedVenues.size > 0 || dateRange !== 'all') && (
-            <span className="inline-block h-1.5 w-1.5 rounded-full bg-indigo-500" />
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-fuchsia-500" />
           )}
         </button>
 
         {showFilters && (
-          <div className="space-y-3 rounded-xl border border-zinc-200 bg-zinc-50/50 p-4 dark:border-zinc-700/60 dark:bg-zinc-900/50">
+          <div className="space-y-3 rounded-xl border border-stone-200 bg-stone-50/50 p-4 dark:border-purple-900/40 dark:bg-[#16101e]/50">
             <VenueFilter
               venues={venues}
               selected={selectedVenues}
@@ -128,19 +128,19 @@ export function EventFeed({ events, venues }: Props) {
         )}
       </div>
 
-      <p className="text-sm text-zinc-500 dark:text-zinc-400">
-        {filtered.length} event{filtered.length !== 1 ? 's' : ''} found
+      <p className="text-sm text-stone-500 dark:text-stone-400">
+        {filtered.length} {filtered.length !== 1 ? 'things' : 'thing'} to do
       </p>
 
       {filtered.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-zinc-300 py-16 text-center dark:border-zinc-700">
-          <p className="text-zinc-400 dark:text-zinc-500">No events match your filters.</p>
+        <div className="rounded-xl border border-dashed border-stone-300 py-16 text-center dark:border-purple-900/40">
+          <p className="text-stone-400 dark:text-stone-500">Nothing matches that vibe right now &mdash; try widening your dates or mood?</p>
         </div>
       ) : (
         <div className="space-y-8">
           {Array.from(grouped.entries()).map(([date, dayEvents]) => (
             <section key={date}>
-              <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+              <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-stone-400 dark:text-stone-500">
                 {date}
               </h2>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

@@ -18,11 +18,11 @@ export function VenueFilter({ venues, selected, onToggle, onClear }: Props) {
         onClick={onClear}
         className={`rounded-full border px-3 py-1 text-sm font-medium transition-colors ${
           allSelected
-            ? 'border-indigo-500 bg-indigo-50 text-indigo-700 dark:border-indigo-400 dark:bg-indigo-950/40 dark:text-indigo-300'
-            : 'border-zinc-200 text-zinc-500 hover:border-zinc-400 dark:border-zinc-700 dark:text-zinc-400 dark:hover:border-zinc-500'
+            ? 'border-fuchsia-500 bg-fuchsia-50 text-fuchsia-700 dark:border-fuchsia-400 dark:bg-fuchsia-950/40 dark:text-fuchsia-300'
+            : 'border-stone-200 text-stone-500 hover:border-stone-400 dark:border-purple-900/40 dark:text-stone-400 dark:hover:border-purple-700/60'
         }`}
       >
-        All
+        Everywhere
       </button>
       {venues.map(v => {
         const active = selected.has(v.id);
@@ -32,13 +32,13 @@ export function VenueFilter({ venues, selected, onToggle, onClear }: Props) {
             onClick={() => onToggle(v.id)}
             className={`rounded-full border px-3 py-1 text-sm font-medium transition-colors ${
               active
-                ? 'border-indigo-500 bg-indigo-50 text-indigo-700 dark:border-indigo-400 dark:bg-indigo-950/40 dark:text-indigo-300'
-                : 'border-zinc-200 text-zinc-500 hover:border-zinc-400 dark:border-zinc-700 dark:text-zinc-400 dark:hover:border-zinc-500'
+                ? 'border-fuchsia-500 bg-fuchsia-50 text-fuchsia-700 dark:border-fuchsia-400 dark:bg-fuchsia-950/40 dark:text-fuchsia-300'
+                : 'border-stone-200 text-stone-500 hover:border-stone-400 dark:border-purple-900/40 dark:text-stone-400 dark:hover:border-purple-700/60'
             }`}
           >
             {v.name}
             {v.source_type === 'personal' && (
-              <span className="ml-1 text-[10px] text-amber-500">*</span>
+              <span className="ml-1 rounded bg-amber-100 px-1 text-[10px] font-semibold text-amber-700 dark:bg-amber-900/40 dark:text-amber-400">you</span>
             )}
           </button>
         );

@@ -18,31 +18,31 @@ export function SurpriseMe({ events }: Props) {
   }
 
   return (
-    <div className="rounded-2xl border border-dashed border-zinc-300 bg-zinc-50/50 p-6 text-center dark:border-zinc-700 dark:bg-zinc-900/50">
+    <div className="rounded-2xl border border-dashed border-stone-300 bg-stone-50/50 p-6 text-center dark:border-purple-900/40 dark:bg-[#16101e]/50">
       {!picked ? (
         <>
-          <p className="mb-1 text-lg font-semibold text-zinc-700 dark:text-zinc-200">
+          <p className="mb-1 text-lg font-semibold text-stone-700 dark:text-stone-200">
             Can&apos;t decide?
           </p>
-          <p className="mb-4 text-sm text-zinc-500 dark:text-zinc-400">
+          <p className="mb-4 text-sm text-stone-500 dark:text-stone-400">
             Let us pick something for you.
           </p>
           <button
             onClick={roll}
-            className="rounded-full bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white shadow-md transition-all hover:bg-indigo-700 hover:shadow-lg active:scale-95 dark:bg-indigo-500 dark:hover:bg-indigo-600"
+            className="rounded-full bg-fuchsia-600 px-6 py-2.5 text-sm font-semibold text-white shadow-md transition-all hover:bg-fuchsia-700 hover:shadow-lg active:scale-95 dark:bg-fuchsia-500 dark:hover:bg-fuchsia-600"
           >
-            Surprise me
+            Spin the wheel
           </button>
         </>
       ) : (
         <div className="mx-auto max-w-md space-y-4">
-          <p className="text-sm font-medium text-indigo-600 dark:text-indigo-400">
-            How about this?
+          <p className="text-sm font-medium text-fuchsia-600 dark:text-fuchsia-400">
+            We found a gem
           </p>
           <EventCard event={picked} highlight />
           <button
             onClick={roll}
-            className="rounded-full border border-zinc-300 px-5 py-2 text-sm font-medium text-zinc-600 transition-all hover:border-zinc-400 hover:text-zinc-900 active:scale-95 dark:border-zinc-600 dark:text-zinc-400 dark:hover:text-zinc-100"
+            className="rounded-full border border-stone-300 px-5 py-2 text-sm font-medium text-stone-600 transition-all hover:border-stone-400 hover:text-stone-900 active:scale-95 dark:border-purple-800 dark:text-stone-400 dark:hover:text-stone-100"
           >
             Try another
           </button>

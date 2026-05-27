@@ -8,18 +8,19 @@ interface Props {
 }
 
 const MOODS: { category: VenueCategory; emoji: string; question: string }[] = [
-  { category: 'art', emoji: '\u{1F3A8}', question: 'See some art' },
-  { category: 'music', emoji: '\u{1F3B6}', question: 'Go out dancing' },
-  { category: 'community', emoji: '\u{1F91D}', question: 'Meet people' },
+  { category: 'art', emoji: '\u{1F3A8}', question: 'Gallery hop' },
+  { category: 'music', emoji: '\u{1F3B6}', question: 'Hit the dance floor' },
+  { category: 'community', emoji: '\u{1F91D}', question: 'Find your crowd' },
+  { category: 'personal', emoji: '\u{1F4F1}', question: 'My feeds' },
 ];
 
 export function MoodTiles({ onSelect, active }: Props) {
   return (
     <div className="space-y-3">
-      <p className="text-center text-sm font-medium text-zinc-500 dark:text-zinc-400">
+      <p className="text-center text-sm font-medium text-stone-500 dark:text-stone-400">
         What are you in the mood for?
       </p>
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {MOODS.map(({ category, emoji, question }) => {
           const style = CATEGORY_STYLES[category];
           const isActive = active === category;
@@ -30,11 +31,11 @@ export function MoodTiles({ onSelect, active }: Props) {
               className={`rounded-xl border-2 p-4 text-center transition-all hover:shadow-md active:scale-[0.97] ${
                 isActive
                   ? `${style.bg} ${style.border} shadow-sm`
-                  : 'border-zinc-200 bg-white hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:border-zinc-600'
+                  : 'border-stone-200 bg-white hover:border-stone-300 dark:border-purple-900/40 dark:bg-[#16101e] dark:hover:border-purple-700/60'
               }`}
             >
               <span className="block text-2xl mb-1">{emoji}</span>
-              <span className={`block text-sm font-semibold ${isActive ? style.text : 'text-zinc-700 dark:text-zinc-300'}`}>
+              <span className={`block text-sm font-semibold ${isActive ? style.text : 'text-stone-700 dark:text-stone-300'}`}>
                 {question}
               </span>
             </button>

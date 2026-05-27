@@ -74,23 +74,23 @@ export function EventCard({ event, highlight }: Props) {
       rel="noopener noreferrer"
       className={`group relative block rounded-xl border p-5 transition-all hover:shadow-md ${
         highlight
-          ? 'border-indigo-300 bg-indigo-50/50 ring-1 ring-indigo-200 dark:border-indigo-700 dark:bg-indigo-950/30 dark:ring-indigo-800'
-          : 'border-zinc-200 bg-white hover:border-zinc-400 dark:border-zinc-700/60 dark:bg-zinc-900 dark:hover:border-zinc-500'
+          ? 'border-fuchsia-300 bg-fuchsia-50/50 ring-1 ring-fuchsia-200 dark:border-fuchsia-700 dark:bg-fuchsia-950/30 dark:ring-fuchsia-800'
+          : 'border-stone-200 bg-white hover:border-stone-400 dark:border-purple-900/40 dark:bg-[#16101e] dark:hover:border-purple-700/60'
       }`}
     >
       {urgency && (
-        <span className="absolute -top-2.5 right-3 inline-block rounded-full bg-rose-500 px-2.5 py-0.5 text-[11px] font-bold text-white shadow-sm">
+        <span className="absolute -top-2.5 right-3 inline-block rounded-full bg-pink-500 px-2.5 py-0.5 text-[11px] font-bold text-white shadow-sm dark:bg-pink-400">
           {urgency}
         </span>
       )}
 
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <h3 className="text-[15px] font-semibold leading-snug text-zinc-900 group-hover:text-indigo-600 dark:text-zinc-100 dark:group-hover:text-indigo-400 line-clamp-2">
+          <h3 className="text-[15px] font-semibold leading-snug text-stone-900 group-hover:text-fuchsia-600 dark:text-stone-100 dark:group-hover:text-fuchsia-400 line-clamp-2">
             {event.title}
           </h3>
 
-          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-zinc-500 dark:text-zinc-400">
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-stone-500 dark:text-stone-400">
             <span className="inline-flex items-center gap-1">
               <CalendarIcon />
               {formatDate(event.start_time)}
@@ -100,7 +100,7 @@ export function EventCard({ event, highlight }: Props) {
               {formatTime(event.start_time)}
             </span>
             {event.duration && (
-              <span className="text-zinc-400 dark:text-zinc-500">
+              <span className="text-stone-400 dark:text-stone-500">
                 {formatDuration(event.duration)}
               </span>
             )}
@@ -117,18 +117,18 @@ export function EventCard({ event, highlight }: Props) {
           </span>
           {event.venue?.source_type === 'personal' && (
             <span className="inline-block rounded-md bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-400">
-              Personal
+              From your feeds
             </span>
           )}
         </div>
 
         <button
           onClick={handleCalendarClick}
-          title="Add to calendar"
-          className="inline-flex items-center gap-1 rounded-md border border-zinc-200 bg-white px-2 py-1 text-[11px] font-medium text-zinc-500 transition-all hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-600 active:scale-95 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:border-indigo-600 dark:hover:bg-indigo-950/40 dark:hover:text-indigo-400"
+          title="Save to calendar"
+          className="inline-flex items-center gap-1 rounded-md border border-stone-200 bg-white px-2 py-1 text-[11px] font-medium text-stone-500 transition-all hover:border-fuchsia-300 hover:bg-fuchsia-50 hover:text-fuchsia-600 active:scale-95 dark:border-purple-900/40 dark:bg-[#16101e] dark:text-stone-400 dark:hover:border-fuchsia-600 dark:hover:bg-fuchsia-950/40 dark:hover:text-fuchsia-400"
         >
           <AddCalendarIcon />
-          Add to cal
+          Save to calendar
         </button>
       </div>
     </a>
@@ -153,7 +153,7 @@ function ClockIcon() {
 
 function ArrowIcon() {
   return (
-    <svg className="h-4 w-4 flex-shrink-0 text-zinc-300 transition-transform group-hover:translate-x-0.5 group-hover:text-indigo-500 dark:text-zinc-600" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+    <svg className="h-4 w-4 flex-shrink-0 text-stone-300 transition-transform group-hover:translate-x-0.5 group-hover:text-fuchsia-500 dark:text-stone-600" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 19.5 15-15m0 0H8.25m11.25 0v11.25" />
     </svg>
   );

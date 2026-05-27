@@ -13,15 +13,15 @@ const OPTIONS = [
 
 export function DateFilter({ value, onChange }: Props) {
   return (
-    <div className="flex gap-1 rounded-lg border border-zinc-200 p-0.5 dark:border-zinc-700">
+    <div className="flex gap-1 rounded-lg border border-stone-200 p-0.5 dark:border-purple-900/40">
       {OPTIONS.map(opt => (
         <button
           key={opt.value}
           onClick={() => onChange(opt.value)}
           className={`rounded-md px-3 py-1 text-sm font-medium transition-colors ${
             value === opt.value
-              ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
-              : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100'
+              ? 'bg-fuchsia-600 text-white dark:bg-fuchsia-500 dark:text-white'
+              : 'text-stone-500 hover:text-stone-900 dark:text-stone-400 dark:hover:text-stone-100'
           }`}
         >
           {opt.label}
