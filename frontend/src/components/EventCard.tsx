@@ -1,5 +1,8 @@
+'use client';
+
 import type { Event } from '@/lib/types';
 import { getVenueCategory, CATEGORY_STYLES } from '@/lib/venueCategories';
+import { downloadICS } from '@/lib/ics';
 
 const SHORT_DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -44,7 +47,6 @@ export function getUrgencyLabel(startTime: string): string | null {
   tomorrow.setHours(23, 59, 59, 999);
   if (start <= tomorrow.getTime()) return 'Tomorrow';
 
-  // Check "last day" for multi-day exhibitions
   return null;
 }
 
@@ -58,6 +60,12 @@ export function EventCard({ event, highlight }: Props) {
   const category = getVenueCategory(event.venue_id);
   const style = CATEGORY_STYLES[category];
   const urgency = getUrgencyLabel(event.start_time);
+
+  function handleCalendarClick(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    downloadICS(event);
+  }
 
   return (
     <a
@@ -102,15 +110,26 @@ export function EventCard({ event, highlight }: Props) {
         <ArrowIcon />
       </div>
 
-      <div className="mt-3 flex items-center gap-2">
-        <span className={`inline-block rounded-md border px-2 py-0.5 text-xs font-medium ${style.bg} ${style.text} ${style.border}`}>
-          {venueName}
-        </span>
-        {event.venue?.source_type === 'personal' && (
-          <span className="inline-block rounded-md bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-400">
-            Personal
+      <div className="mt-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className={`inline-block rounded-md border px-2 py-0.5 text-xs font-medium ${style.bg} ${style.text} ${style.border}`}>
+            {venueName}
           </span>
-        )}
+          {event.venue?.source_type === 'personal' && (
+            <span className="inline-block rounded-md bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-400">
+              Personal
+            </span>
+          )}
+        </div>
+
+        <button
+          onClick={handleCalendarClick}
+          title="Add to calendar"
+          className="inline-flex items-center gap-1 rounded-md border border-zinc-200 bg-white px-2 py-1 text-[11px] font-medium text-zinc-500 transition-all hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-600 active:scale-95 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:border-indigo-600 dark:hover:bg-indigo-950/40 dark:hover:text-indigo-400"
+        >
+          <AddCalendarIcon />
+          Add to cal
+        </button>
       </div>
     </a>
   );
@@ -136,6 +155,14 @@ function ArrowIcon() {
   return (
     <svg className="h-4 w-4 flex-shrink-0 text-zinc-300 transition-transform group-hover:translate-x-0.5 group-hover:text-indigo-500 dark:text-zinc-600" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 19.5 15-15m0 0H8.25m11.25 0v11.25" />
+    </svg>
+  );
+}
+
+function AddCalendarIcon() {
+  return (
+    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5m-9-6v6m3-3H9" />
     </svg>
   );
 }
