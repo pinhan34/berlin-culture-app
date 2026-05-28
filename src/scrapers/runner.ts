@@ -40,13 +40,13 @@ async function runOrchestrator() {
                 clubId: '15179',
                 name: 'SO36',
                 venueId: 5,
-                keywords: /gayhane|queer\s*slam|flinta|queer|roller\s*disco/i,
+                keywords: /.*/,
             },
             {
                 clubId: '132060',
                 name: 'Festsaal Kreuzberg',
                 venueId: 9,
-                keywords: /queer|gay|drag|ocean\s*eyes|xjazz/i,
+                keywords: /.*/,
             },
             {
                 clubId: '249089',

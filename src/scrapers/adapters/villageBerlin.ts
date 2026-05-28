@@ -1,86 +1,98 @@
-import { chromium, type Page } from 'playwright';
 import type { WebsiteAdapter, NormalizedEvent } from '../interfaces.js';
+
+interface VillageEvent {
+    occurrence_id: string;
+    id: number;
+    title: string;
+    event_date: string;
+    event_end: string | null;
+    location: string;
+    permalink: string;
+    short_description: string;
+    categories: { id: number; slug: string; name: string }[];
+    tags: { id: number; slug: string; name: string }[];
+}
+
+interface VillageEventsResponse {
+    timezone: string;
+    currency: string;
+    generated_at: string;
+    events: VillageEvent[];
+}
 
 export class VillageBerlinAdapter implements WebsiteAdapter {
     sourceName = 'Village Berlin';
     venueId = 3;
-    targetUrl = 'https://wearevillage.org/en/calendar/';
+    targetUrl = 'https://wearevillage.org/wp-json/village/v1/events';
 
     async scrape(): Promise<NormalizedEvent[]> {
-        console.log(`[${this.sourceName}] Starting scrape...`);
-
-        const headless = process.env['DEBUG_HEADED'] !== '1';
-        const browser = await chromium.launch({ headless });
-        const context = await browser.newContext();
-        const page = await context.newPage();
+        console.log(`[${this.sourceName}] Starting scrape via REST API...`);
 
         try {
-            await page.goto(this.targetUrl, { waitUntil: 'networkidle', timeout: 30000 });
+            const today = new Date().toISOString().slice(0, 10);
+            const url = `${this.targetUrl}?lang=en&from=${today}&per_page=200`;
 
-            // Wait for actual content to render — the site is slow / JS-heavy
-            await page.waitForSelector('p, li', { timeout: 15000 }).catch(() => {
-                console.log(`[${this.sourceName}] Selector wait timed out, proceeding with available DOM...`);
+            const res = await fetch(url, {
+                headers: { 'Accept': 'application/json' },
+                signal: AbortSignal.timeout(20_000),
             });
 
-            const events = await this.extractEventsFromDOM(page);
+            if (!res.ok) {
+                console.error(`[${this.sourceName}] API responded ${res.status}`);
+                return [];
+            }
+
+            const data: VillageEventsResponse = await res.json();
+            const events = this.normalize(data.events);
 
             console.log(`[${this.sourceName}] Found ${events.length} events.`);
             return events;
         } catch (error) {
             console.error(`[${this.sourceName}] Scrape failed:`, error);
             return [];
-        } finally {
-            await browser.close();
         }
     }
 
-    private async extractEventsFromDOM(page: Page): Promise<NormalizedEvent[]> {
-        const raw = await page.evaluate((venueId: number) => {
-            const elements = document.querySelectorAll('p, li');
-            const batch: any[] = [];
+    private normalize(raw: VillageEvent[]): NormalizedEvent[] {
+        return raw
+            .filter((e) => e.title && e.event_date && e.permalink)
+            .map((e) => ({
+                venue_id: this.venueId,
+                title: this.decodeHtml(e.title),
+                start_time: new Date(e.event_date).toISOString(),
+                duration: this.extractDuration(e),
+                event_url: e.permalink,
+            }));
+    }
 
-            elements.forEach((element) => {
-                const text = element.textContent || '';
+    private extractDuration(e: VillageEvent): string | null {
+        if (!e.event_end) return null;
+        const start = new Date(e.event_date).getTime();
+        const end = new Date(e.event_end).getTime();
+        const diffMs = end - start;
+        if (diffMs <= 0) return null;
 
-                const dateRegex = /(\d{2})\.(\d{2})\.(\d{4})(?:\s*-\s*(\d{2}):(\d{2}))?/;
-                const match = text.match(dateRegex);
+        const hours = Math.floor(diffMs / 3_600_000);
+        const mins = Math.round((diffMs % 3_600_000) / 60_000);
+        const parts: string[] = [];
+        if (hours > 0) parts.push(`${hours} hour${hours > 1 ? 's' : ''}`);
+        if (mins > 0) parts.push(`${mins} min${mins > 1 ? 's' : ''}`);
+        return parts.join(' ') || null;
+    }
 
-                if (!match) return;
-
-                const [fullDateMatch, day, month, year, hour, minute] = match;
-                if (!fullDateMatch || !day || !month || !year) return;
-
-                let titleText = text.split(fullDateMatch)[0]?.replace(/^[-\s•]+/, '').trim() ?? '';
-                if (titleText.endsWith('.')) titleText = titleText.slice(0, -1).trim();
-
-                if (!titleText || titleText.length < 3 || titleText.includes('Calendar for App')) return;
-
-                const finalHour = hour || '19';
-                const finalMinute = minute || '00';
-
-                const parsedISOString = new Date(
-                    `${year}-${month}-${day}T${finalHour}:${finalMinute}:00Z`
-                ).toISOString();
-
-                // Look for any link within this element or its parent container
-                const linkEl = element.querySelector('a[href]') as HTMLAnchorElement
-                    ?? (element.closest('div, section, article')?.querySelector('a[href]') as HTMLAnchorElement);
-                const eventUrl = linkEl?.href ?? 'https://wearevillage.org/en/calendar/';
-
-                batch.push({
-                    venue_id: venueId,
-                    title: titleText,
-                    start_time: parsedISOString,
-                    duration: null,
-                    event_url: eventUrl,
-                });
-            });
-
-            return batch;
-        }, this.venueId);
-
-        return raw.filter(
-            (e): e is NormalizedEvent => !!e.title && !!e.start_time && !!e.venue_id
-        );
+    private decodeHtml(text: string): string {
+        return text
+            .replace(/&#8211;/g, '–')
+            .replace(/&#8212;/g, '—')
+            .replace(/&#8216;/g, '\u2018')
+            .replace(/&#8217;/g, '\u2019')
+            .replace(/&#8220;/g, '\u201C')
+            .replace(/&#8221;/g, '\u201D')
+            .replace(/&amp;/g, '&')
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/&quot;/g, '"')
+            .replace(/&#039;/g, "'")
+            .replace(/&nbsp;/g, ' ');
     }
 }
