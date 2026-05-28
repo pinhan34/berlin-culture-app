@@ -1,9 +1,9 @@
-import { chromium, type Page } from 'playwright';
+import { chromium } from 'playwright';
 import type { WebsiteAdapter, NormalizedEvent } from '../interfaces.js';
 
 export class SinemaTranstopiaAdapter implements WebsiteAdapter {
     sourceName = 'Sinema Transtopia';
-    venueId = 1; // Maps directly to your internal database sequence primary key
+    venueId = 1;
     targetUrl = 'https://sinematranstopia.com/en/calendar';
 
     async scrape(): Promise<NormalizedEvent[]> {
@@ -15,10 +15,11 @@ export class SinemaTranstopiaAdapter implements WebsiteAdapter {
         const page = await context.newPage();
 
         try {
-            await page.goto(this.targetUrl, { waitUntil: 'domcontentloaded' });
-            await page.waitForSelector('ul.calendar-list li, .program-list li', { timeout: 10000 });
+            await page.goto(this.targetUrl, { waitUntil: 'domcontentloaded', timeout: 20000 });
+            await page.waitForTimeout(3000);
 
-            const events = await this.extractEventsFromDOM(page);
+            const html = await page.content();
+            const events = this.extractEvents(html);
 
             console.log(`[${this.sourceName}] Found ${events.length} events.`);
             return events;
@@ -30,51 +31,78 @@ export class SinemaTranstopiaAdapter implements WebsiteAdapter {
         }
     }
 
-    private async extractEventsFromDOM(page: Page): Promise<NormalizedEvent[]> {
-        const raw = await page.evaluate((venueId: number) => {
-            const listings = document.querySelectorAll('ul.calendar-list li, .program-list li');
-            const batch: any[] = [];
-            const currentYear = new Date().getFullYear();
+    private extractEvents(html: string): NormalizedEvent[] {
+        const results: NormalizedEvent[] = [];
+        const seen = new Set<string>();
+        const now = new Date();
 
-            const months: { [key: string]: string } = {
-                Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06',
-                Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12'
-            };
+        const dateTimeRe = /(\d{2})\.(\d{2})\.(\d{4})\s+(\d{2}):(\d{2})/g;
+        let match: RegExpExecArray | null;
 
-            listings.forEach((element) => {
-                const linkElement = element.querySelector('a:not([href*="tickets"])') as HTMLAnchorElement;
-                const titleText = linkElement?.textContent?.trim().replace(/\.\s*$/, '');
-                const dateSpan = element.querySelector('.date, span')?.textContent?.trim();
-                const ticketElement = element.querySelector('a[href*="tickets"], a[href*="kinotickets"]') as HTMLAnchorElement;
+        while ((match = dateTimeRe.exec(html)) !== null) {
+            const [, day, month, year, hour, minute] = match;
+            const isoString = `${year}-${month}-${day}T${hour}:${minute}:00Z`;
 
-                if (!titleText || !dateSpan) return;
+            let startTime: Date;
+            try {
+                startTime = new Date(isoString);
+                if (isNaN(startTime.getTime())) continue;
+                if (startTime < now) continue;
+            } catch {
+                continue;
+            }
 
-                const dateMatch = dateSpan.match(/([A-Za-z]+)\s+(\d{1,2})\.\s+[A-Za-z]+\.\s+(\d{2}):(\d{2})/);
-                if (!dateMatch) return;
+            const afterMatch = html.substring(match.index + match[0].length, match.index + match[0].length + 800);
 
-                const [_, monthName, day, hour, minute] = dateMatch;
-                const monthNum = months[monthName?.substring(0, 3) ?? ''];
-                if (!monthNum) return;
+            const textAfter = afterMatch.replace(/<[^>]+>/g, '\n').replace(/&[^;]+;/g, ' ');
+            const lines = textAfter.split('\n').map(l => l.trim()).filter(l => l.length > 2);
 
-                const formattedDay = day?.padStart(2, '0') ?? '';
-                const parsedISOString = new Date(
-                    `${currentYear}-${monthNum}-${formattedDay}T${hour}:${minute}:00Z`
-                ).toISOString();
+            let title = '';
+            let category = '';
+            for (const line of lines.slice(0, 6)) {
+                if (/^\d{2}[.\/:]\d{2}/.test(line)) continue;
+                if (/^(Tickets?|Registration|Gratis|Open Air|Meyhane|Application)$/i.test(line)) continue;
 
-                batch.push({
-                    venue_id: venueId,
-                    title: titleText,
-                    start_time: parsedISOString,
-                    duration: null,
-                    event_url: ticketElement?.href ?? linkElement?.href ?? 'https://sinematranstopia.com/en/calendar'
-                });
+                if (!category) {
+                    category = line;
+                } else if (!title) {
+                    title = line;
+                    break;
+                }
+            }
+
+            if (!title && category) {
+                title = category;
+                category = '';
+            }
+            if (!title || title.length < 3) continue;
+
+            if (category && category.length < 40) {
+                title = `${category}: ${title}`;
+            }
+
+            if (title.length > 120) {
+                title = title.substring(0, 117) + '...';
+            }
+
+            const key = `${title}|${isoString}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+
+            const linkMatch = afterMatch.match(/href="(\/[^"]*?)"/);
+            const eventUrl = linkMatch
+                ? `https://sinematranstopia.com${linkMatch[1]}`
+                : this.targetUrl;
+
+            results.push({
+                venue_id: this.venueId,
+                title,
+                start_time: startTime.toISOString(),
+                duration: null,
+                event_url: eventUrl,
             });
+        }
 
-            return batch;
-        }, this.venueId);
-
-        return raw.filter(
-            (e): e is NormalizedEvent => !!e.title && !!e.start_time && !!e.venue_id
-        );
+        return results;
     }
 }

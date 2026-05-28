@@ -105,15 +105,68 @@ export class TelegramGroupAdapter implements WebsiteAdapter {
         }
     }
 
+    private async resolveInviteHash(client: TelegramClient, hash: string): Promise<Api.TypeChat | null> {
+        try {
+            const result = await client.invoke(
+                new Api.messages.CheckChatInvite({ hash })
+            );
+
+            if (result instanceof Api.ChatInviteAlready || result instanceof Api.ChatInvitePeek) {
+                console.log(`[${this.sourceName}] Already a member of invite-link group.`);
+                return result.chat;
+            }
+
+            console.log(`[${this.sourceName}] Not yet a member, joining via invite link...`);
+            const joinResult = await client.invoke(
+                new Api.messages.ImportChatInvite({ hash })
+            );
+            if ('chats' in joinResult && (joinResult as any).chats?.length > 0) {
+                return (joinResult as any).chats[0];
+            }
+            return null;
+        } catch (error) {
+            console.error(`[${this.sourceName}] Failed to resolve invite hash "${hash}":`, error);
+            return null;
+        }
+    }
+
+    private getInputPeer(chat: Api.TypeChat): Api.TypeInputPeer {
+        if (chat instanceof Api.Channel) {
+            return new Api.InputPeerChannel({
+                channelId: chat.id,
+                accessHash: (chat.accessHash as any) ?? BigInt(0),
+            });
+        }
+        if (chat instanceof Api.Chat) {
+            return new Api.InputPeerChat({ chatId: chat.id });
+        }
+        throw new Error(`Unsupported chat type: ${chat.className}`);
+    }
+
     private async scrapeGroup(client: TelegramClient, groupId: string): Promise<NormalizedEvent[]> {
         const cutoff = new Date();
         cutoff.setDate(cutoff.getDate() - this.lookbackDays);
 
-        const entity = await client.getEntity(groupId);
-        const groupName = ('title' in entity ? entity.title : undefined) ?? groupId;
+        let peer: any;
+        let groupName = groupId;
+        const isInviteHash = groupId.startsWith('+') || groupId.startsWith('joinchat/');
+
+        if (isInviteHash) {
+            const hash = groupId.replace(/^\+/, '').replace(/^joinchat\//, '');
+            const chat = await this.resolveInviteHash(client, hash);
+            if (!chat) {
+                console.error(`[${this.sourceName}] Could not resolve invite hash: ${groupId}`);
+                return [];
+            }
+            peer = this.getInputPeer(chat);
+            groupName = ('title' in chat ? chat.title : undefined) ?? groupId;
+        } else {
+            peer = await client.getEntity(groupId);
+            groupName = ('title' in peer ? (peer as any).title : undefined) ?? groupId;
+        }
         console.log(`[${this.sourceName}] Fetching messages from "${groupName}" (last ${this.lookbackDays} days)...`);
 
-        const messages = await client.getMessages(entity, {
+        const messages = await client.getMessages(peer, {
             limit: 200,
             offsetDate: Math.floor(Date.now() / 1000),
         });

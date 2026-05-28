@@ -94,7 +94,7 @@ export function EventFeed({ events, venues }: Props) {
       {/* Divider */}
       <div className="flex items-center gap-4">
         <div className="h-px flex-1 bg-stone-200 dark:bg-purple-900/40" />
-        <span className="text-xs font-semibold uppercase tracking-widest text-stone-400 dark:text-stone-500">
+        <span className="font-heading text-xs font-bold uppercase tracking-widest text-stone-500 dark:text-stone-400">
           Browse everything
         </span>
         <div className="h-px flex-1 bg-stone-200 dark:bg-purple-900/40" />
@@ -104,14 +104,18 @@ export function EventFeed({ events, venues }: Props) {
       <div>
         <button
           onClick={() => setShowFilters(f => !f)}
-          className="mb-3 inline-flex items-center gap-1.5 rounded-lg border border-stone-200 px-3 py-1.5 text-xs font-medium text-stone-600 transition-colors hover:border-stone-400 dark:border-purple-900/40 dark:text-stone-400 dark:hover:border-purple-700/60"
+          className={`mb-3 inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold transition-all active:scale-95 ${
+            showFilters || selectedVenues.size > 0 || dateRange !== 'all'
+              ? 'bg-fuchsia-600 text-white shadow-sm hover:bg-fuchsia-700 dark:bg-fuchsia-500 dark:hover:bg-fuchsia-600'
+              : 'border border-fuchsia-300 bg-fuchsia-50 text-fuchsia-700 hover:bg-fuchsia-100 hover:shadow-sm dark:border-fuchsia-700 dark:bg-fuchsia-950/30 dark:text-fuchsia-300 dark:hover:bg-fuchsia-950/50'
+          }`}
         >
           <svg className={`h-3 w-3 transition-transform ${showFilters ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
           </svg>
           Filter &amp; explore
           {(selectedVenues.size > 0 || dateRange !== 'all') && (
-            <span className="inline-block h-1.5 w-1.5 rounded-full bg-fuchsia-500" />
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-white dark:bg-fuchsia-200" />
           )}
         </button>
 
@@ -128,8 +132,11 @@ export function EventFeed({ events, venues }: Props) {
         )}
       </div>
 
-      <p className="text-sm text-stone-500 dark:text-stone-400">
-        {filtered.length} {filtered.length !== 1 ? 'things' : 'thing'} to do
+      <p className="animate-fade-up font-heading text-lg font-bold text-stone-700 dark:text-stone-200">
+        <span className="bg-gradient-to-r from-fuchsia-600 to-pink-500 bg-clip-text text-transparent dark:from-fuchsia-400 dark:to-pink-400">
+          {filtered.length}
+        </span>
+        {' '}{filtered.length !== 1 ? 'things' : 'thing'} to do
       </p>
 
       {filtered.length === 0 ? (
@@ -140,12 +147,20 @@ export function EventFeed({ events, venues }: Props) {
         <div className="space-y-8">
           {Array.from(grouped.entries()).map(([date, dayEvents]) => (
             <section key={date}>
-              <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-stone-400 dark:text-stone-500">
+              <h2 className="font-heading mb-3 text-xs font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">
                 {date}
               </h2>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {dayEvents.map(event => (
-                  <EventCard key={event.id} event={event} />
+              <div className={`grid gap-3 ${
+                dayEvents.length === 1
+                  ? 'sm:grid-cols-1 lg:max-w-md'
+                  : dayEvents.length === 2
+                    ? 'sm:grid-cols-2 lg:grid-cols-2'
+                    : 'sm:grid-cols-2 lg:grid-cols-3'
+              }`}>
+                {dayEvents.map((event, i) => (
+                  <div key={event.id} className={`animate-fade-up stagger-${Math.min(i + 1, 9)}`}>
+                    <EventCard event={event} />
+                  </div>
                 ))}
               </div>
             </section>

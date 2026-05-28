@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { EventFeed } from '@/components/EventFeed';
+import { VenueStrip } from '@/components/VenueStrip';
 import type { Event, Venue } from '@/lib/types';
 
 export const revalidate = 300; // ISR: refresh data every 5 minutes
@@ -41,13 +42,15 @@ export default async function Home() {
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
       <div className="mb-8">
-        <h2 className="text-2xl font-bold tracking-tight text-stone-900 dark:text-stone-100">
+        <h2 className="font-heading text-2xl font-bold tracking-tight text-stone-900 dark:text-stone-100">
           What&apos;s happening in Berlin
         </h2>
         <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">
           Hand-picked from {venues.length} of Berlin&apos;s best cultural spots
         </p>
       </div>
+
+      <VenueStrip venues={venues} />
 
       <EventFeed events={events} venues={venues} />
     </div>
