@@ -30,7 +30,7 @@ async function runOrchestrator() {
     // 3. Register your active venue adapters here
     const activeAdapters: WebsiteAdapter[] = [
         new SinemaTranstopiaAdapter(),
-        new MeetUpAdapter(2, [
+        new MeetUpAdapter(4, [
             'berlin-neurodivergent-community',
         ]),
         new VillageBerlinAdapter(),

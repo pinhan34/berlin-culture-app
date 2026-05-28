@@ -16,7 +16,7 @@ export function VenueCard({ venue, eventCount }: Props) {
   return (
     <div
       id={`venue-${venue.id}`}
-      className="rounded-xl border border-stone-200 bg-white p-5 dark:border-purple-900/40 dark:bg-[#16101e]"
+      className="scroll-mt-24 rounded-xl border border-stone-200 bg-white p-5 transition-shadow target:ring-2 target:ring-fuchsia-400 target:shadow-lg dark:border-purple-900/40 dark:bg-[#16101e] dark:target:ring-fuchsia-600"
     >
       <div className="flex items-start justify-between gap-2">
         <h2 className="font-heading text-lg font-bold text-stone-900 dark:text-stone-100">
@@ -30,8 +30,14 @@ export function VenueCard({ venue, eventCount }: Props) {
       </div>
 
       {identity.tagline && (
-        <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">
+        <p className="mt-1 text-sm font-medium text-stone-500 dark:text-stone-400">
           {identity.tagline}
+        </p>
+      )}
+
+      {identity.description && (
+        <p className="mt-2 text-sm leading-relaxed text-stone-600 dark:text-stone-300">
+          {identity.description}
         </p>
       )}
 

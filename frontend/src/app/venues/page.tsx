@@ -61,7 +61,7 @@ export default async function VenuesPage() {
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 scroll-smooth">
         {venues.map(v => (
           <VenueCard key={v.id} venue={v} eventCount={v.eventCount} />
         ))}

@@ -103,19 +103,20 @@ export function EventFeed({ events, venues }: Props) {
       {/* Collapsible filters */}
       <div>
         <button
-          onClick={() => setShowFilters(f => !f)}
-          className={`mb-3 inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold transition-all active:scale-95 ${
+          type="button"
+          onClick={() => { setShowFilters(prev => !prev); }}
+          className={`mb-3 inline-flex cursor-pointer items-center gap-2 rounded-full px-5 py-2.5 text-sm font-bold uppercase tracking-wide transition-all active:scale-95 ${
             showFilters || selectedVenues.size > 0 || dateRange !== 'all'
-              ? 'bg-fuchsia-600 text-white shadow-sm hover:bg-fuchsia-700 dark:bg-fuchsia-500 dark:hover:bg-fuchsia-600'
-              : 'border border-fuchsia-300 bg-fuchsia-50 text-fuchsia-700 hover:bg-fuchsia-100 hover:shadow-sm dark:border-fuchsia-700 dark:bg-fuchsia-950/30 dark:text-fuchsia-300 dark:hover:bg-fuchsia-950/50'
+              ? 'bg-fuchsia-600 text-white shadow-md hover:bg-fuchsia-700 dark:bg-fuchsia-500 dark:hover:bg-fuchsia-600'
+              : 'border-2 border-fuchsia-400 bg-fuchsia-50 text-fuchsia-700 shadow-sm hover:bg-fuchsia-100 hover:shadow-md dark:border-fuchsia-600 dark:bg-fuchsia-950/30 dark:text-fuchsia-300 dark:hover:bg-fuchsia-950/50'
           }`}
         >
-          <svg className={`h-3 w-3 transition-transform ${showFilters ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+          <svg className={`h-4 w-4 transition-transform ${showFilters ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
           </svg>
-          Filter &amp; explore
+          Filter &amp; Explore
           {(selectedVenues.size > 0 || dateRange !== 'all') && (
-            <span className="inline-block h-1.5 w-1.5 rounded-full bg-white dark:bg-fuchsia-200" />
+            <span className="inline-block h-2 w-2 rounded-full bg-white dark:bg-fuchsia-200" />
           )}
         </button>
 

@@ -17,7 +17,7 @@ export class NeuroDivergentAdapter implements WebsiteAdapter {
         try {
             await page.goto(this.targetUrl, { waitUntil: 'domcontentloaded' });
 
-            await page.waitForSelector('article, .eventlist-event, .summary-item, .flyer-card', {
+            await page.waitForSelector('article, .eventlist-event, .summary-item, .flyer-card, [data-hook="events-card"], li[data-testid]', {
                 timeout: 10000,
             }).catch(() => {
                 console.log(`[${this.sourceName}] No event cards found in DOM, proceeding anyway...`);
@@ -25,7 +25,7 @@ export class NeuroDivergentAdapter implements WebsiteAdapter {
 
             const events = await this.extractEventsFromDOM(page);
 
-            console.log(`[${this.sourceName}] Found ${events.length} queer/FLINTA-filtered events.`);
+            console.log(`[${this.sourceName}] Found ${events.length} events.`);
             return events;
         } catch (error) {
             console.error(`[${this.sourceName}] Scrape failed:`, error);
@@ -37,22 +37,16 @@ export class NeuroDivergentAdapter implements WebsiteAdapter {
 
     private async extractEventsFromDOM(page: Page): Promise<NormalizedEvent[]> {
         const raw = await page.evaluate((venueId: number) => {
-            const eventCards = document.querySelectorAll('article, .eventlist-event, .summary-item, .flyer-card');
+            const eventCards = document.querySelectorAll('article, .eventlist-event, .summary-item, .flyer-card, [data-hook="events-card"], li[data-testid]');
             const batch: any[] = [];
             const currentYear = new Date().getFullYear();
 
             eventCards.forEach((card) => {
-                const titleElement = card.querySelector('.eventlist-title, h1, h2, h3, .summary-title a');
+                const titleElement = card.querySelector('.eventlist-title, h1, h2, h3, .summary-title a, [data-hook="title"] a, [data-hook="title"]');
                 const titleText = titleElement?.textContent?.trim() || '';
+                if (!titleText || titleText.length < 3) return;
 
-                const containsRainbowEmoji = titleText.includes('🌈');
-                const containsQueerKeywords = /queer|flinta|lgbt|trans|non-binary/i.test(titleText);
-
-                if (!containsRainbowEmoji && !containsQueerKeywords) {
-                    return;
-                }
-
-                const timeElement = card.querySelector('.eventlist-meta-time, time, .summary-metadata--date');
+                const timeElement = card.querySelector('.eventlist-meta-time, time, .summary-metadata--date, [data-hook="date"], [data-hook="time"]');
                 const dateText = timeElement?.textContent?.trim() || '';
 
                 const linkElement = card.querySelector('a') as HTMLAnchorElement;
