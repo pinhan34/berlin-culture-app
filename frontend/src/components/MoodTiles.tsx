@@ -5,6 +5,7 @@ import { CATEGORY_STYLES, type VenueCategory } from '@/lib/venueCategories';
 interface Props {
   onSelect: (category: VenueCategory | null) => void;
   active: VenueCategory | null;
+  counts?: Partial<Record<VenueCategory, number>>;
 }
 
 const MOODS: { category: VenueCategory; emoji: string; question: string }[] = [
@@ -14,7 +15,7 @@ const MOODS: { category: VenueCategory; emoji: string; question: string }[] = [
   { category: 'personal', emoji: '\u{1F4F1}', question: 'My feeds' },
 ];
 
-export function MoodTiles({ onSelect, active }: Props) {
+export function MoodTiles({ onSelect, active, counts }: Props) {
   return (
     <div className="space-y-3">
       <p className="font-heading text-center text-sm font-bold text-stone-600 dark:text-stone-300">
@@ -24,6 +25,7 @@ export function MoodTiles({ onSelect, active }: Props) {
         {MOODS.map(({ category, emoji, question }, i) => {
           const style = CATEGORY_STYLES[category];
           const isActive = active === category;
+          const count = counts?.[category];
           return (
             <button
               key={category}
@@ -37,6 +39,11 @@ export function MoodTiles({ onSelect, active }: Props) {
               <span className={`block text-sm font-semibold ${isActive ? style.text : 'text-stone-700 dark:text-stone-300'}`}>
                 {question}
               </span>
+              {count !== undefined && (
+                <span className={`mt-1 block text-xs font-normal ${isActive ? style.text : 'text-stone-400 dark:text-stone-500'}`}>
+                  {count} {count === 1 ? 'event' : 'events'}
+                </span>
+              )}
             </button>
           );
         })}

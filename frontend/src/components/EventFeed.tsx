@@ -48,6 +48,31 @@ function groupByDate(events: Event[]): Map<string, Event[]> {
   return groups;
 }
 
+/**
+ * Fix 3 — round-robin through categories within a single day so no
+ * single source (e.g. Telegram) dominates the top of any given day.
+ * Art → Music → Community → Personal → Art → ...
+ */
+function interleaveByCategory(dayEvents: Event[]): Event[] {
+  const buckets: Record<string, Event[]> = {};
+  for (const e of dayEvents) {
+    const cat = getVenueCategory(e.venue_id);
+    (buckets[cat] ??= []).push(e);
+  }
+  const queues = Object.values(buckets);
+  const result: Event[] = [];
+  while (queues.some(q => q.length > 0)) {
+    for (const queue of queues) {
+      const item = queue.shift();
+      if (item) result.push(item);
+    }
+  }
+  return result;
+}
+
+/** Fix 2 — max events shown per venue in the default (unfiltered) view. */
+const VENUE_DISPLAY_CAP = 30;
+
 export function EventFeed({ events, venues }: Props) {
   // Persisted filter preferences — survive page reload
   const [moodCategory, setMoodCategoryRaw] = useLocalStorage<VenueCategory | null>('bca_mood', null);
@@ -64,8 +89,31 @@ export function EventFeed({ events, venues }: Props) {
 
   const cutoff = useMemo(() => getDateCutoff(dateRange), [dateRange]);
 
-  const filtered = useMemo(() => {
+  // Fix 2 — cap each venue to VENUE_DISPLAY_CAP events so no single source
+  // floods the feed. Applied before any user filtering.
+  const cappedEvents = useMemo(() => {
+    const countByVenue = new Map<number, number>();
     return events.filter(e => {
+      const n = countByVenue.get(e.venue_id) ?? 0;
+      if (n >= VENUE_DISPLAY_CAP) return false;
+      countByVenue.set(e.venue_id, n + 1);
+      return true;
+    });
+  }, [events]);
+
+  // Fix 1 — category counts for mood tile badges (based on capped, date-bounded set)
+  const categoryCounts = useMemo(() => {
+    const counts: Partial<Record<VenueCategory, number>> = {};
+    for (const e of cappedEvents) {
+      if (new Date(e.start_time) > cutoff) continue;
+      const cat = getVenueCategory(e.venue_id);
+      counts[cat] = (counts[cat] ?? 0) + 1;
+    }
+    return counts;
+  }, [cappedEvents, cutoff]);
+
+  const filtered = useMemo(() => {
+    return cappedEvents.filter(e => {
       if (showFavourites && !favouriteSet.has(e.id)) return false;
       if (!showFavourites) {
         if (selectedVenues.size > 0 && !selectedVenues.has(e.venue_id)) return false;
@@ -74,9 +122,20 @@ export function EventFeed({ events, venues }: Props) {
       if (new Date(e.start_time) > cutoff) return false;
       return true;
     });
-  }, [events, selectedVenues, moodCategory, cutoff, showFavourites, favouriteSet]);
+  }, [cappedEvents, selectedVenues, moodCategory, cutoff, showFavourites, favouriteSet]);
 
-  const grouped = useMemo(() => groupByDate(filtered), [filtered]);
+  // Fix 3 — interleave by category in the default view so no source dominates a day.
+  // When a specific mood/venue/favourites filter is active, keep plain chronological order.
+  const grouped = useMemo(() => {
+    const groups = groupByDate(filtered);
+    const isDefaultView = !moodCategory && selectedVenues.size === 0 && !showFavourites;
+    if (isDefaultView) {
+      for (const [date, dayEvents] of groups) {
+        groups.set(date, interleaveByCategory(dayEvents));
+      }
+    }
+    return groups;
+  }, [filtered, moodCategory, selectedVenues, showFavourites]);
 
   function toggleVenue(id: number) {
     setVenueArray(prev => prev.includes(id) ? prev.filter(v => v !== id) : [...prev, id]);
@@ -102,7 +161,7 @@ export function EventFeed({ events, venues }: Props) {
   return (
     <div className="space-y-8">
       {/* Mood tiles */}
-      <MoodTiles active={moodCategory} onSelect={handleMoodSelect} />
+      <MoodTiles active={moodCategory} onSelect={handleMoodSelect} counts={categoryCounts} />
 
       {/* Saved events toggle */}
       {favouriteIds.length > 0 && (
