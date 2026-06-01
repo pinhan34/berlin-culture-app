@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react';
 import type { Event, Venue } from '@/lib/types';
 import { getVenueCategory, type VenueCategory } from '@/lib/venueCategories';
+import { useLocalStorage } from '@/lib/useLocalStorage';
 import { EventCard } from './EventCard';
 import { VenueFilter } from './VenueFilter';
 import { DateFilter } from './DateFilter';
@@ -48,42 +49,78 @@ function groupByDate(events: Event[]): Map<string, Event[]> {
 }
 
 export function EventFeed({ events, venues }: Props) {
-  const [selectedVenues, setSelectedVenues] = useState<Set<number>>(new Set());
-  const [dateRange, setDateRange] = useState('all');
-  const [moodCategory, setMoodCategory] = useState<VenueCategory | null>(null);
+  // Persisted filter preferences — survive page reload
+  const [moodCategory, setMoodCategoryRaw] = useLocalStorage<VenueCategory | null>('bca_mood', null);
+  const [venueArray, setVenueArray] = useLocalStorage<number[]>('bca_venues', []);
+  const [dateRange, setDateRange] = useLocalStorage<string>('bca_date', 'all');
+  const [favouriteIds, setFavouriteIds] = useLocalStorage<number[]>('bca_favourites', []);
+
+  // Session-only UI state
   const [showFilters, setShowFilters] = useState(false);
+  const [showFavourites, setShowFavourites] = useState(false);
+
+  const selectedVenues = useMemo(() => new Set(venueArray), [venueArray]);
+  const favouriteSet = useMemo(() => new Set(favouriteIds), [favouriteIds]);
 
   const cutoff = useMemo(() => getDateCutoff(dateRange), [dateRange]);
 
   const filtered = useMemo(() => {
     return events.filter(e => {
-      if (selectedVenues.size > 0 && !selectedVenues.has(e.venue_id)) return false;
-      if (moodCategory && getVenueCategory(e.venue_id) !== moodCategory) return false;
+      if (showFavourites && !favouriteSet.has(e.id)) return false;
+      if (!showFavourites) {
+        if (selectedVenues.size > 0 && !selectedVenues.has(e.venue_id)) return false;
+        if (moodCategory && getVenueCategory(e.venue_id) !== moodCategory) return false;
+      }
       if (new Date(e.start_time) > cutoff) return false;
       return true;
     });
-  }, [events, selectedVenues, moodCategory, cutoff]);
+  }, [events, selectedVenues, moodCategory, cutoff, showFavourites, favouriteSet]);
 
   const grouped = useMemo(() => groupByDate(filtered), [filtered]);
 
   function toggleVenue(id: number) {
-    setSelectedVenues(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+    setVenueArray(prev => prev.includes(id) ? prev.filter(v => v !== id) : [...prev, id]);
   }
 
   function handleMoodSelect(cat: VenueCategory | null) {
-    setMoodCategory(cat);
-    setSelectedVenues(new Set());
+    setMoodCategoryRaw(cat);
+    setVenueArray([]);
+    setShowFavourites(false);
+  }
+
+  function handleFavouriteToggle(eventId: number) {
+    setFavouriteIds(prev =>
+      prev.includes(eventId) ? prev.filter(id => id !== eventId) : [...prev, eventId],
+    );
+  }
+
+  function handleShowFavourites() {
+    setShowFavourites(prev => !prev);
+    if (!showFavourites) setMoodCategoryRaw(null);
   }
 
   return (
     <div className="space-y-8">
       {/* Mood tiles */}
       <MoodTiles active={moodCategory} onSelect={handleMoodSelect} />
+
+      {/* Saved events toggle */}
+      {favouriteIds.length > 0 && (
+        <div className="flex justify-center">
+          <button
+            type="button"
+            onClick={handleShowFavourites}
+            className={`inline-flex items-center gap-2 rounded-full px-5 py-2 text-sm font-bold transition-all active:scale-95 ${
+              showFavourites
+                ? 'bg-pink-500 text-white shadow-md hover:bg-pink-600 dark:bg-pink-600 dark:hover:bg-pink-500'
+                : 'border-2 border-pink-300 bg-pink-50 text-pink-600 hover:bg-pink-100 dark:border-pink-700 dark:bg-pink-950/30 dark:text-pink-400 dark:hover:bg-pink-950/50'
+            }`}
+          >
+            <HeartButtonIcon filled={showFavourites} />
+            {showFavourites ? 'All events' : `Saved (${favouriteIds.length})`}
+          </button>
+        </div>
+      )}
 
       {/* Quick picks */}
       <QuickPicks events={filtered} />
@@ -126,7 +163,7 @@ export function EventFeed({ events, venues }: Props) {
               venues={venues}
               selected={selectedVenues}
               onToggle={toggleVenue}
-              onClear={() => setSelectedVenues(new Set())}
+              onClear={() => setVenueArray([])}
             />
             <DateFilter value={dateRange} onChange={setDateRange} />
           </div>
@@ -160,7 +197,11 @@ export function EventFeed({ events, venues }: Props) {
               }`}>
                 {dayEvents.map((event, i) => (
                   <div key={event.id} className={`animate-fade-up stagger-${Math.min(i + 1, 9)}`}>
-                    <EventCard event={event} />
+                    <EventCard
+                      event={event}
+                      isFavourited={favouriteSet.has(event.id)}
+                      onFavouriteToggle={handleFavouriteToggle}
+                    />
                   </div>
                 ))}
               </div>
@@ -169,5 +210,17 @@ export function EventFeed({ events, venues }: Props) {
         </div>
       )}
     </div>
+  );
+}
+
+function HeartButtonIcon({ filled }: { filled: boolean }) {
+  return filled ? (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M11.645 20.91l-.007-.003-.022-.012a15.247 15.247 0 0 1-.383-.218 25.18 25.18 0 0 1-4.244-3.17C4.688 15.36 2.25 12.174 2.25 8.25 2.25 5.322 4.714 3 7.688 3A5.5 5.5 0 0 1 12 5.052 5.5 5.5 0 0 1 16.313 3c2.973 0 5.437 2.322 5.437 5.25 0 3.925-2.438 7.111-4.739 9.256a25.175 25.175 0 0 1-4.244 3.17 15.247 15.247 0 0 1-.383.219l-.022.012-.007.004-.003.001a.752.752 0 0 1-.704 0l-.003-.001Z" />
+    </svg>
+  ) : (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z" />
+    </svg>
   );
 }

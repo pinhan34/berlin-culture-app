@@ -3,6 +3,7 @@
 import type { Event } from '@/lib/types';
 import { getVenueCategory, CATEGORY_STYLES } from '@/lib/venueCategories';
 import { downloadICS } from '@/lib/ics';
+import { trackInteraction } from '@/lib/interactions';
 
 const SHORT_DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -53,9 +54,11 @@ export function getUrgencyLabel(startTime: string): string | null {
 interface Props {
   event: Event;
   highlight?: boolean;
+  isFavourited?: boolean;
+  onFavouriteToggle?: (id: number) => void;
 }
 
-export function EventCard({ event, highlight }: Props) {
+export function EventCard({ event, highlight, isFavourited = false, onFavouriteToggle }: Props) {
   const venueName = event.venue?.name ?? `Venue #${event.venue_id}`;
   const category = getVenueCategory(event.venue_id);
   const style = CATEGORY_STYLES[category];
@@ -64,7 +67,18 @@ export function EventCard({ event, highlight }: Props) {
   function handleCalendarClick(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
+    trackInteraction(event.id, 'calendar');
     downloadICS(event);
+  }
+
+  function handleFavouriteClick(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    onFavouriteToggle?.(event.id);
+  }
+
+  function handleCardClick() {
+    trackInteraction(event.id, 'click');
   }
 
   return (
@@ -72,6 +86,7 @@ export function EventCard({ event, highlight }: Props) {
       href={event.event_url ?? '#'}
       target="_blank"
       rel="noopener noreferrer"
+      onClick={handleCardClick}
       className={`group relative block rounded-xl border p-5 transition-all hover:shadow-md ${
         highlight
           ? 'border-fuchsia-300 bg-fuchsia-50/50 ring-1 ring-fuchsia-200 dark:border-fuchsia-700 dark:bg-fuchsia-950/30 dark:ring-fuchsia-800'
@@ -122,14 +137,28 @@ export function EventCard({ event, highlight }: Props) {
           )}
         </div>
 
-        <button
-          onClick={handleCalendarClick}
-          title="Save to calendar"
-          className="inline-flex items-center gap-1 rounded-md border border-stone-200 bg-white px-2 py-1 text-[11px] font-medium text-stone-500 transition-all hover:border-fuchsia-300 hover:bg-fuchsia-50 hover:text-fuchsia-600 active:scale-95 dark:border-purple-900/40 dark:bg-[#16101e] dark:text-stone-400 dark:hover:border-fuchsia-600 dark:hover:bg-fuchsia-950/40 dark:hover:text-fuchsia-400"
-        >
-          <AddCalendarIcon />
-          Save to calendar
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleCalendarClick}
+            title="Save to calendar"
+            className="inline-flex items-center gap-1 rounded-md border border-stone-200 bg-white px-2 py-1 text-[11px] font-medium text-stone-500 transition-all hover:border-fuchsia-300 hover:bg-fuchsia-50 hover:text-fuchsia-600 active:scale-95 dark:border-purple-900/40 dark:bg-[#16101e] dark:text-stone-400 dark:hover:border-fuchsia-600 dark:hover:bg-fuchsia-950/40 dark:hover:text-fuchsia-400"
+          >
+            <AddCalendarIcon />
+            Save to calendar
+          </button>
+
+          <button
+            onClick={handleFavouriteClick}
+            title={isFavourited ? 'Remove from favourites' : 'Save to favourites'}
+            className={`inline-flex items-center justify-center rounded-md border p-1.5 transition-all active:scale-95 ${
+              isFavourited
+                ? 'border-pink-300 bg-pink-50 text-pink-500 hover:bg-pink-100 dark:border-pink-700 dark:bg-pink-950/40 dark:text-pink-400 dark:hover:bg-pink-950/60'
+                : 'border-stone-200 bg-white text-stone-400 hover:border-pink-300 hover:bg-pink-50 hover:text-pink-500 dark:border-purple-900/40 dark:bg-[#16101e] dark:text-stone-500 dark:hover:border-pink-700 dark:hover:bg-pink-950/40 dark:hover:text-pink-400'
+            }`}
+          >
+            <HeartIcon filled={isFavourited} />
+          </button>
+        </div>
       </div>
     </a>
   );
@@ -163,6 +192,18 @@ function AddCalendarIcon() {
   return (
     <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5m-9-6v6m3-3H9" />
+    </svg>
+  );
+}
+
+function HeartIcon({ filled }: { filled: boolean }) {
+  return filled ? (
+    <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M11.645 20.91l-.007-.003-.022-.012a15.247 15.247 0 0 1-.383-.218 25.18 25.18 0 0 1-4.244-3.17C4.688 15.36 2.25 12.174 2.25 8.25 2.25 5.322 4.714 3 7.688 3A5.5 5.5 0 0 1 12 5.052 5.5 5.5 0 0 1 16.313 3c2.973 0 5.437 2.322 5.437 5.25 0 3.925-2.438 7.111-4.739 9.256a25.175 25.175 0 0 1-4.244 3.17 15.247 15.247 0 0 1-.383.219l-.022.012-.007.004-.003.001a.752.752 0 0 1-.704 0l-.003-.001Z" />
+    </svg>
+  ) : (
+    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z" />
     </svg>
   );
 }
