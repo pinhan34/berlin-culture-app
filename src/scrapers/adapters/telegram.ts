@@ -358,13 +358,32 @@ export class TelegramGroupAdapter implements WebsiteAdapter {
         const clean = text.replace(URL_RE, '').trim();
         const lines = clean.split('\n').map(l => l.trim()).filter(l => l.length > 0);
 
-        // First non-empty line is usually the title/subject
-        let title = lines[0] ?? '';
+        // Patterns that indicate a line is promotional noise rather than an event title
+        const PROMO_LINE_RE = /^\d+\s*(?:€|euro|eur)\b/i;          // "15 Euro", "€10"
+        const DATE_ONLY_RE = /^\d{1,2}[.:]\d{1,2}/;                // "24.05" or "20:00"
+        const EMOJI_NOISE_RE = /^[\p{Emoji}\s]+$/u;                 // line is just emojis
+        const SHORT_CAPS_RE = /^[A-Z0-9\s€!]{2,30}$/;             // "FREE ENTRY", "SOLD OUT"
 
-        // If first line looks like a date/time only, try the next line
-        if (/^\d{1,2}[.:]\d{1,2}/.test(title) && lines[1]) {
-            title = lines[1];
+        function isNoiseLine(line: string): boolean {
+            return (
+                PROMO_LINE_RE.test(line) ||
+                DATE_ONLY_RE.test(line) ||
+                EMOJI_NOISE_RE.test(line) ||
+                SHORT_CAPS_RE.test(line)
+            );
         }
+
+        // Walk lines until we find one that looks like a real title
+        let title = '';
+        for (const line of lines) {
+            if (!isNoiseLine(line) && line.length >= 5) {
+                title = line;
+                break;
+            }
+        }
+
+        // Fall back to first line if nothing better was found
+        if (!title) title = lines[0] ?? '';
 
         // Trim to reasonable length
         if (title.length > 120) {

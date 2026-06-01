@@ -60,15 +60,21 @@ interface Props {
 
 // Display name overrides — lets us show a friendlier name without touching the DB
 const VENUE_DISPLAY_NAMES: Record<number, string> = {
-  2: 'ND Community',   // MeetUp: berlin-neurodivergent-community
-  7: 'Queer Berlin',   // Telegram: QUEER EVENTS Berlin group
+  2: 'ND Community',        // MeetUp: berlin-neurodivergent-community
+  7: 'QUEER EVENTS Berlin', // Telegram: QUEER EVENTS Berlin group
 };
+
+// Telegram fallback URLs require login — detect them so we can handle them differently
+function isTelegramFallback(url: string | null | undefined): boolean {
+  return !!url && /^https:\/\/t\.me\//.test(url);
+}
 
 export function EventCard({ event, highlight, isFavourited = false, onFavouriteToggle }: Props) {
   const venueName = VENUE_DISPLAY_NAMES[event.venue_id] ?? event.venue?.name ?? `Venue #${event.venue_id}`;
   const category = getVenueCategory(event.venue_id);
   const style = CATEGORY_STYLES[category];
   const urgency = getUrgencyLabel(event.start_time);
+  const telegramOnly = isTelegramFallback(event.event_url);
 
   function handleCalendarClick(e: React.MouseEvent) {
     e.preventDefault();
@@ -87,18 +93,14 @@ export function EventCard({ event, highlight, isFavourited = false, onFavouriteT
     trackInteraction(event.id, 'click');
   }
 
-  return (
-    <a
-      href={event.event_url ?? '#'}
-      target="_blank"
-      rel="noopener noreferrer"
-      onClick={handleCardClick}
-      className={`group relative block rounded-xl border p-5 transition-all hover:shadow-md ${
-        highlight
-          ? 'border-fuchsia-300 bg-fuchsia-50/50 ring-1 ring-fuchsia-200 dark:border-fuchsia-700 dark:bg-fuchsia-950/30 dark:ring-fuchsia-800'
-          : 'border-stone-200 bg-white hover:border-stone-400 dark:border-purple-900/40 dark:bg-[#16101e] dark:hover:border-purple-700/60'
-      }`}
-    >
+  const cardClass = `group relative block rounded-xl border p-5 transition-all hover:shadow-md ${
+    highlight
+      ? 'border-fuchsia-300 bg-fuchsia-50/50 ring-1 ring-fuchsia-200 dark:border-fuchsia-700 dark:bg-fuchsia-950/30 dark:ring-fuchsia-800'
+      : 'border-stone-200 bg-white hover:border-stone-400 dark:border-purple-900/40 dark:bg-[#16101e] dark:hover:border-purple-700/60'
+  }`;
+
+  const cardContent = (
+    <>
       {urgency && (
         <span className="absolute -top-2.5 right-3 inline-block rounded-full bg-pink-500 px-2.5 py-0.5 text-[11px] font-bold text-white shadow-sm dark:bg-pink-400">
           {urgency}
@@ -107,7 +109,11 @@ export function EventCard({ event, highlight, isFavourited = false, onFavouriteT
 
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <h3 className="text-[15px] font-semibold leading-snug text-stone-900 group-hover:text-fuchsia-600 dark:text-stone-100 dark:group-hover:text-fuchsia-400 line-clamp-2">
+          <h3 className={`text-[15px] font-semibold leading-snug line-clamp-2 ${
+            telegramOnly
+              ? 'text-stone-900 dark:text-stone-100'
+              : 'text-stone-900 group-hover:text-fuchsia-600 dark:text-stone-100 dark:group-hover:text-fuchsia-400'
+          }`}>
             {event.title}
           </h3>
 
@@ -128,39 +134,69 @@ export function EventCard({ event, highlight, isFavourited = false, onFavouriteT
           </div>
         </div>
 
-        <ArrowIcon />
+        {!telegramOnly && <ArrowIcon />}
+      </div>
+    </>
+  );
+
+  const bottomRow = (
+    <div className="mt-3 flex items-center justify-between">
+      <div className="flex items-center gap-2">
+        <span className={`inline-block rounded-md border px-2 py-0.5 text-xs font-medium ${style.bg} ${style.text} ${style.border}`}>
+          {venueName}
+        </span>
       </div>
 
-      <div className="mt-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className={`inline-block rounded-md border px-2 py-0.5 text-xs font-medium ${style.bg} ${style.text} ${style.border}`}>
-            {venueName}
-          </span>
-        </div>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={handleCalendarClick}
+          title="Save to calendar"
+          className="inline-flex items-center gap-1 rounded-md border border-stone-200 bg-white px-2 py-1 text-[11px] font-medium text-stone-500 transition-all hover:border-fuchsia-300 hover:bg-fuchsia-50 hover:text-fuchsia-600 active:scale-95 dark:border-purple-900/40 dark:bg-[#16101e] dark:text-stone-400 dark:hover:border-fuchsia-600 dark:hover:bg-fuchsia-950/40 dark:hover:text-fuchsia-400"
+        >
+          <AddCalendarIcon />
+          Save to calendar
+        </button>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleCalendarClick}
-            title="Save to calendar"
-            className="inline-flex items-center gap-1 rounded-md border border-stone-200 bg-white px-2 py-1 text-[11px] font-medium text-stone-500 transition-all hover:border-fuchsia-300 hover:bg-fuchsia-50 hover:text-fuchsia-600 active:scale-95 dark:border-purple-900/40 dark:bg-[#16101e] dark:text-stone-400 dark:hover:border-fuchsia-600 dark:hover:bg-fuchsia-950/40 dark:hover:text-fuchsia-400"
-          >
-            <AddCalendarIcon />
-            Save to calendar
-          </button>
-
-          <button
-            onClick={handleFavouriteClick}
-            title={isFavourited ? 'Remove from favourites' : 'Save to favourites'}
-            className={`inline-flex items-center justify-center rounded-md border p-1.5 transition-all active:scale-95 ${
-              isFavourited
-                ? 'border-pink-300 bg-pink-50 text-pink-500 hover:bg-pink-100 dark:border-pink-700 dark:bg-pink-950/40 dark:text-pink-400 dark:hover:bg-pink-950/60'
-                : 'border-stone-200 bg-white text-stone-400 hover:border-pink-300 hover:bg-pink-50 hover:text-pink-500 dark:border-purple-900/40 dark:bg-[#16101e] dark:text-stone-500 dark:hover:border-pink-700 dark:hover:bg-pink-950/40 dark:hover:text-pink-400'
-            }`}
-          >
-            <HeartIcon filled={isFavourited} />
-          </button>
-        </div>
+        <button
+          onClick={handleFavouriteClick}
+          title={isFavourited ? 'Remove from favourites' : 'Save to favourites'}
+          className={`inline-flex items-center justify-center rounded-md border p-1.5 transition-all active:scale-95 ${
+            isFavourited
+              ? 'border-pink-300 bg-pink-50 text-pink-500 hover:bg-pink-100 dark:border-pink-700 dark:bg-pink-950/40 dark:text-pink-400 dark:hover:bg-pink-950/60'
+              : 'border-stone-200 bg-white text-stone-400 hover:border-pink-300 hover:bg-pink-50 hover:text-pink-500 dark:border-purple-900/40 dark:bg-[#16101e] dark:text-stone-500 dark:hover:border-pink-700 dark:hover:bg-pink-950/40 dark:hover:text-pink-400'
+          }`}
+        >
+          <HeartIcon filled={isFavourited} />
+        </button>
       </div>
+    </div>
+  );
+
+  return telegramOnly ? (
+    <div className={cardClass}>
+      {cardContent}
+      {bottomRow}
+      <a
+        href={event.event_url!}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={handleCardClick}
+        className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-sky-200 bg-sky-50 px-3 py-1.5 text-[11px] font-medium text-sky-600 transition-all hover:bg-sky-100 active:scale-95 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-400 dark:hover:bg-sky-950/60"
+      >
+        <TelegramIcon />
+        View in Telegram (requires login)
+      </a>
+    </div>
+  ) : (
+    <a
+      href={event.event_url ?? '#'}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={handleCardClick}
+      className={cardClass}
+    >
+      {cardContent}
+      {bottomRow}
     </a>
   );
 }
@@ -193,6 +229,14 @@ function AddCalendarIcon() {
   return (
     <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5m-9-6v6m3-3H9" />
+    </svg>
+  );
+}
+
+function TelegramIcon() {
+  return (
+    <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.244-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
     </svg>
   );
 }
