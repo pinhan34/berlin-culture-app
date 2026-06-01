@@ -73,6 +73,22 @@ function interleaveByCategory(dayEvents: Event[]): Event[] {
 /** Fix 2 — max events shown per venue in the default (unfiltered) view. */
 const VENUE_DISPLAY_CAP = 30;
 
+/** Telegram venue id — events without a real external URL are excluded. */
+const TELEGRAM_VENUE_ID = 7;
+
+/** Titles that are clearly promotional noise rather than event names. */
+const PROMO_TITLE_RE = /^\d+\s*(?:€|euro|eur)\b/i;
+
+function isQualityEvent(e: Event): boolean {
+  if (e.venue_id === TELEGRAM_VENUE_ID) {
+    // Only show Telegram events that link to a real external page
+    if (!e.event_url || e.event_url.startsWith('https://t.me/')) return false;
+  }
+  // Drop events with obviously promotional titles (e.g. "15 € UNTIL MONDAY ONLY")
+  if (PROMO_TITLE_RE.test(e.title)) return false;
+  return true;
+}
+
 export function EventFeed({ events, venues }: Props) {
   // Persisted filter preferences — survive page reload
   const [moodCategory, setMoodCategoryRaw] = useLocalStorage<VenueCategory | null>('bca_mood', null);
@@ -89,11 +105,12 @@ export function EventFeed({ events, venues }: Props) {
 
   const cutoff = useMemo(() => getDateCutoff(dateRange), [dateRange]);
 
-  // Fix 2 — cap each venue to VENUE_DISPLAY_CAP events so no single source
-  // floods the feed. Applied before any user filtering.
+  // Quality filter + venue cap — applied before any user filtering.
+  // Removes promo-only Telegram events and caps each venue to VENUE_DISPLAY_CAP.
   const cappedEvents = useMemo(() => {
     const countByVenue = new Map<number, number>();
     return events.filter(e => {
+      if (!isQualityEvent(e)) return false;
       const n = countByVenue.get(e.venue_id) ?? 0;
       if (n >= VENUE_DISPLAY_CAP) return false;
       countByVenue.set(e.venue_id, n + 1);

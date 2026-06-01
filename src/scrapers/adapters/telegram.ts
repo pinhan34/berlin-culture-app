@@ -225,14 +225,19 @@ export class TelegramGroupAdapter implements WebsiteAdapter {
         }
 
         const urlMatch = text.match(URL_RE);
-        const eventUrl = urlMatch?.[0] ?? `https://t.me/${groupName}`;
+        const externalUrl = urlMatch?.[0];
+
+        // Only keep messages that link to a real event page (not just the group itself).
+        // Promo-only messages ("15 € until Monday") have no external link and should not
+        // become events — they have no event page to send the user to.
+        if (!externalUrl || externalUrl.startsWith('https://t.me/')) return null;
 
         return {
             venue_id: this.venueId,
             title,
             start_time: startTime,
             duration: null,
-            event_url: eventUrl,
+            event_url: externalUrl,
         };
     }
 
