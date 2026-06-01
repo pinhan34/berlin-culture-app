@@ -13,16 +13,22 @@ async function getData(): Promise<{ events: Event[]; venues: Venue[] }> {
 
   const now = new Date().toISOString();
 
+  // venue_id 4 (neurodivergent-berlin.com) is retired — MeetUp (id 2) covers the same
+  // community with better data quality. Old DB rows are excluded here until they expire.
+  const RETIRED_VENUE_IDS = [4];
+
   const [eventsRes, venuesRes] = await Promise.all([
     supabase
       .from('events')
       .select('*, venue:venues(*)')
       .gte('start_time', now)
+      .not('venue_id', 'in', `(${RETIRED_VENUE_IDS.join(',')})`)
       .order('start_time', { ascending: true })
       .limit(500),
     supabase
       .from('venues')
       .select('*')
+      .not('id', 'in', `(${RETIRED_VENUE_IDS.join(',')})`)
       .order('name', { ascending: true }),
   ]);
 
@@ -46,7 +52,7 @@ export default async function Home() {
           What&apos;s happening in Berlin
         </h2>
         <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">
-          Hand-picked from {venues.length} of Berlin&apos;s best indie + queer + ND-friendly spaces and communities
+          Hand-picked from {venues.length}{' '}of Berlin&apos;s best indie + queer + ND-friendly spaces and communities
         </p>
       </div>
 
