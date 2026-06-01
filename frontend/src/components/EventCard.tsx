@@ -58,8 +58,14 @@ interface Props {
   onFavouriteToggle?: (id: number) => void;
 }
 
+// Display name overrides — lets us show a friendlier name without touching the DB
+const VENUE_DISPLAY_NAMES: Record<number, string> = {
+  2: 'ND Community',   // MeetUp: berlin-neurodivergent-community
+  7: 'Queer Berlin',   // Telegram: QUEER EVENTS Berlin group
+};
+
 export function EventCard({ event, highlight, isFavourited = false, onFavouriteToggle }: Props) {
-  const venueName = event.venue?.name ?? `Venue #${event.venue_id}`;
+  const venueName = VENUE_DISPLAY_NAMES[event.venue_id] ?? event.venue?.name ?? `Venue #${event.venue_id}`;
   const category = getVenueCategory(event.venue_id);
   const style = CATEGORY_STYLES[category];
   const urgency = getUrgencyLabel(event.start_time);
@@ -130,11 +136,6 @@ export function EventCard({ event, highlight, isFavourited = false, onFavouriteT
           <span className={`inline-block rounded-md border px-2 py-0.5 text-xs font-medium ${style.bg} ${style.text} ${style.border}`}>
             {venueName}
           </span>
-          {event.venue?.source_type === 'personal' && (
-            <span className="inline-block rounded-md bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-400">
-              From your feeds
-            </span>
-          )}
         </div>
 
         <div className="flex items-center gap-2">

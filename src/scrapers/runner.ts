@@ -4,7 +4,6 @@ import { MeetUpAdapter } from './adapters/meetup.js';
 import { VillageBerlinAdapter } from './adapters/villageBerlin.js';
 import type { WebsiteAdapter, NormalizedEvent } from './interfaces.js';
 import dotenv from 'dotenv';
-import { NeuroDivergentAdapter } from './adapters/neurodivergent.js';
 import { ResidentAdvisorAdapter } from './adapters/residentAdvisor.js';
 import { FlutgrabenAdapter } from './adapters/flutgraben.js';
 import { TelegramGroupAdapter } from './adapters/telegram.js';
@@ -34,7 +33,6 @@ async function runOrchestrator() {
             'berlin-neurodivergent-community',
         ]),
         new VillageBerlinAdapter(),
-        new NeuroDivergentAdapter(),
         new ResidentAdvisorAdapter([
             {
                 clubId: '15179',
