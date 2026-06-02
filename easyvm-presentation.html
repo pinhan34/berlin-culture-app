@@ -237,32 +237,8 @@
   </div>
 </div>
 
-<!-- Slide 3: Architektur -->
+<!-- Slide 3: Was bereits existiert -->
 <div class="slide" id="s3">
-  <h2>Architektur-Übersicht</h2>
-  <p style="margin-bottom: 28px;">Allgemeines Diagramm &mdash; anwendbar unabhängig vom gewählten IaC-Tool</p>
-
-  <div class="flow">
-    <div class="flow-step highlight">Benutzer<br><small style="color:var(--muted)">Formular ausfüllen</small></div>
-    <span class="flow-arrow">&rarr;</span>
-    <div class="flow-step">Backend (.NET)<br><small style="color:var(--muted)">Request empfangen</small></div>
-    <span class="flow-arrow">&rarr;</span>
-    <div class="flow-step">Azure Resource Manager<br><small style="color:var(--muted)">Template deployen</small></div>
-    <span class="flow-arrow">&rarr;</span>
-    <div class="flow-branch">
-      <div class="flow-step">Resource Group</div>
-      <div class="flow-step">VNet / Subnet</div>
-      <div class="flow-step">NSG (Firewall)</div>
-      <div class="flow-step">NIC + Public IP</div>
-      <div class="flow-step">VM + Disks + Artifacts</div>
-    </div>
-    <span class="flow-arrow">&rarr;</span>
-    <div class="flow-step highlight">Status<br><small style="color:var(--muted)">an Benutzer melden</small></div>
-  </div>
-</div>
-
-<!-- Slide 4: Was bereits existiert -->
-<div class="slide" id="s4">
   <h2>Was bereits existiert</h2>
 
   <div class="card-grid">
@@ -290,6 +266,30 @@
     <strong>Kernidee:</strong> Statt jeden Schritt dem Benutzer aufzuerlegen,
     wollen wir diese Schritte automatisieren. Die vorhandene Dokumentation
     wird zur Template-Spezifikation.
+  </div>
+</div>
+
+<!-- Slide 4: Architektur -->
+<div class="slide" id="s4">
+  <h2>Architektur-Übersicht</h2>
+  <p style="margin-bottom: 28px;">Allgemeines Diagramm &mdash; anwendbar unabhängig vom gewählten IaC-Tool</p>
+
+  <div class="flow">
+    <div class="flow-step highlight">Benutzer<br><small style="color:var(--muted)">Formular ausfüllen</small></div>
+    <span class="flow-arrow">&rarr;</span>
+    <div class="flow-step">Backend (.NET)<br><small style="color:var(--muted)">Request empfangen</small></div>
+    <span class="flow-arrow">&rarr;</span>
+    <div class="flow-step">Azure Resource Manager<br><small style="color:var(--muted)">Template deployen</small></div>
+    <span class="flow-arrow">&rarr;</span>
+    <div class="flow-branch">
+      <div class="flow-step">Resource Group</div>
+      <div class="flow-step">VNet / Subnet</div>
+      <div class="flow-step">NSG (Firewall)</div>
+      <div class="flow-step">NIC + Public IP</div>
+      <div class="flow-step">VM + Disks + Artifacts</div>
+    </div>
+    <span class="flow-arrow">&rarr;</span>
+    <div class="flow-step highlight">Status<br><small style="color:var(--muted)">an Benutzer melden</small></div>
   </div>
 </div>
 

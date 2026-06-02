@@ -1,5 +1,7 @@
 import type { Event } from './types';
 
+// ─── Shared helpers ───────────────────────────────────────────────────────────
+
 function toICSDate(iso: string): string {
   return new Date(iso).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
 }
@@ -78,4 +80,72 @@ export function downloadICS(event: Event) {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+// ─── Direct calendar links (no download needed) ───────────────────────────────
+
+function getEndIso(event: Event): string {
+  if (event.duration) {
+    const ms = parseDurationMs(event.duration);
+    if (ms) return new Date(new Date(event.start_time).getTime() + ms).toISOString();
+  }
+  return new Date(new Date(event.start_time).getTime() + 7_200_000).toISOString();
+}
+
+export function buildGoogleCalendarUrl(event: Event): string {
+  const start = toICSDate(event.start_time);
+  const end   = toICSDate(getEndIso(event));
+  const p = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: event.title,
+    dates: `${start}/${end}`,
+    ...(event.venue?.address ? { location: event.venue.address } : {}),
+    ...(event.event_url      ? { details: event.event_url }       : {}),
+  });
+  return `https://calendar.google.com/calendar/render?${p.toString()}`;
+}
+
+export function buildOutlookUrl(event: Event): string {
+  const p = new URLSearchParams({
+    subject:  event.title,
+    startdt:  event.start_time,
+    enddt:    getEndIso(event),
+    ...(event.venue?.address ? { location: event.venue.address } : {}),
+    ...(event.event_url      ? { body: event.event_url }         : {}),
+  });
+  return `https://outlook.live.com/calendar/0/deeplink/compose?${p.toString()}`;
+}
+
+// ─── Full feed for webcal subscription ────────────────────────────────────────
+
+export function generateFeedICS(events: Event[]): string {
+  const vevents = events.map(e => {
+    const start = toICSDate(e.start_time);
+    const end   = toICSDate(getEndIso(e));
+    const location = e.venue?.address ?? e.venue?.name ?? '';
+    const uid = `event-${e.id}@berlin-culture-app`;
+    return [
+      'BEGIN:VEVENT',
+      `UID:${uid}`,
+      `DTSTART:${start}`,
+      `DTEND:${end}`,
+      `SUMMARY:${escapeICS(e.title)}`,
+      location      ? `LOCATION:${escapeICS(location)}`  : '',
+      e.event_url   ? `URL:${e.event_url}`                : '',
+      `DTSTAMP:${toICSDate(new Date().toISOString())}`,
+      'END:VEVENT',
+    ].filter(Boolean).join('\r\n');
+  });
+
+  return [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Berlin Culture App//EN',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    'X-WR-CALNAME:Berlin Culture App',
+    'X-WR-TIMEZONE:Europe/Berlin',
+    ...vevents,
+    'END:VCALENDAR',
+  ].join('\r\n');
 }

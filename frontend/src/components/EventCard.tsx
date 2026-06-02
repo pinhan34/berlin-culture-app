@@ -1,8 +1,9 @@
 'use client';
 
+import { useState, useRef, useEffect } from 'react';
 import type { Event } from '@/lib/types';
 import { getVenueCategory, CATEGORY_STYLES } from '@/lib/venueCategories';
-import { downloadICS } from '@/lib/ics';
+import { downloadICS, buildGoogleCalendarUrl, buildOutlookUrl } from '@/lib/ics';
 import { trackInteraction } from '@/lib/interactions';
 
 const SHORT_DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -70,13 +71,6 @@ export function EventCard({ event, highlight, isFavourited = false, onFavouriteT
   const style = CATEGORY_STYLES[category];
   const urgency = getUrgencyLabel(event.start_time);
 
-  function handleCalendarClick(e: React.MouseEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-    trackInteraction(event.id, 'calendar');
-    downloadICS(event);
-  }
-
   function handleFavouriteClick(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
@@ -139,14 +133,7 @@ export function EventCard({ event, highlight, isFavourited = false, onFavouriteT
         </div>
 
         <div className="flex items-center gap-2">
-          <button
-            onClick={handleCalendarClick}
-            title="Save to calendar"
-            className="inline-flex items-center gap-1 rounded-md border border-stone-200 bg-white px-2 py-1 text-[11px] font-medium text-stone-500 transition-all hover:border-fuchsia-300 hover:bg-fuchsia-50 hover:text-fuchsia-600 active:scale-95 dark:border-purple-900/40 dark:bg-[#16101e] dark:text-stone-400 dark:hover:border-fuchsia-600 dark:hover:bg-fuchsia-950/40 dark:hover:text-fuchsia-400"
-          >
-            <AddCalendarIcon />
-            Save to calendar
-          </button>
+          <CalendarDropdown event={event} />
 
           <button
             onClick={handleFavouriteClick}
@@ -162,6 +149,70 @@ export function EventCard({ event, highlight, isFavourited = false, onFavouriteT
         </div>
       </div>
     </a>
+  );
+}
+
+function CalendarDropdown({ event }: { event: Event }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onMouseDown(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', onMouseDown);
+    return () => document.removeEventListener('mousedown', onMouseDown);
+  }, [open]);
+
+  function pick(e: React.MouseEvent, action: () => void) {
+    e.preventDefault();
+    e.stopPropagation();
+    trackInteraction(event.id, 'calendar');
+    action();
+    setOpen(false);
+  }
+
+  const btnClass = 'inline-flex items-center gap-1 rounded-md border border-stone-200 bg-white px-2 py-1 text-[11px] font-medium text-stone-500 transition-all hover:border-fuchsia-300 hover:bg-fuchsia-50 hover:text-fuchsia-600 active:scale-95 dark:border-purple-900/40 dark:bg-[#16101e] dark:text-stone-400 dark:hover:border-fuchsia-600 dark:hover:bg-fuchsia-950/40 dark:hover:text-fuchsia-400';
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen(p => !p); }}
+        className={btnClass}
+        title="Add to calendar"
+      >
+        <AddCalendarIcon />
+        Add to calendar
+        <svg className={`h-3 w-3 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="absolute bottom-full right-0 z-20 mb-1 min-w-[160px] overflow-hidden rounded-lg border border-stone-200 bg-white shadow-lg dark:border-purple-900/40 dark:bg-[#1e1830]">
+          <button
+            onClick={(e) => pick(e, () => window.open(buildGoogleCalendarUrl(event), '_blank'))}
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12px] text-stone-600 hover:bg-stone-50 dark:text-stone-300 dark:hover:bg-white/5"
+          >
+            <GoogleCalendarIcon /> Google Calendar
+          </button>
+          <button
+            onClick={(e) => pick(e, () => window.open(buildOutlookUrl(event), '_blank'))}
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12px] text-stone-600 hover:bg-stone-50 dark:text-stone-300 dark:hover:bg-white/5"
+          >
+            <OutlookIcon /> Outlook
+          </button>
+          <div className="my-1 border-t border-stone-100 dark:border-purple-900/30" />
+          <button
+            onClick={(e) => pick(e, () => downloadICS(event))}
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12px] text-stone-600 hover:bg-stone-50 dark:text-stone-300 dark:hover:bg-white/5"
+          >
+            <AppleIcon /> Apple / .ics file
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -197,6 +248,37 @@ function AddCalendarIcon() {
   );
 }
 
+
+function GoogleCalendarIcon() {
+  return (
+    <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none">
+      <rect x="3" y="3" width="18" height="18" rx="2" fill="#fff" stroke="#dadce0"/>
+      <rect x="3" y="8" width="18" height="2" fill="#4285f4"/>
+      <rect x="8" y="3" width="2" height="4" rx="1" fill="#4285f4"/>
+      <rect x="14" y="3" width="2" height="4" rx="1" fill="#4285f4"/>
+      <text x="12" y="18" textAnchor="middle" fontSize="7" fontWeight="700" fill="#4285f4">G</text>
+    </svg>
+  );
+}
+
+function OutlookIcon() {
+  return (
+    <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none">
+      <rect x="2" y="4" width="20" height="16" rx="2" fill="#0078d4"/>
+      <rect x="2" y="4" width="11" height="16" rx="2" fill="#0078d4"/>
+      <rect x="10" y="4" width="12" height="16" rx="1" fill="#106ebe"/>
+      <circle cx="7.5" cy="12" r="3.5" fill="#fff"/>
+    </svg>
+  );
+}
+
+function AppleIcon() {
+  return (
+    <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98l-.09.06c-.22.15-2.19 1.28-2.17 3.81.03 3.02 2.65 4.03 2.68 4.04l-.06.27ZM13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11Z"/>
+    </svg>
+  );
+}
 
 function HeartIcon({ filled }: { filled: boolean }) {
   return filled ? (
