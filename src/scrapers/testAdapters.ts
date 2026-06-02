@@ -11,6 +11,31 @@ import type { WebsiteAdapter, NormalizedEvent } from './interfaces.js';
 
 dotenv.config();
 
+function describeError(reason: unknown): string {
+    if (!reason) return 'unknown error';
+    if (typeof reason === 'string') return reason;
+    const r = reason as Record<string, unknown>;
+    // GramJS uses null-prototype objects; extract all own property names
+    const allKeys = Object.getOwnPropertyNames(reason);
+    const parts: string[] = [];
+    for (const k of allKeys) {
+        if (typeof r[k] !== 'function' && typeof r[k] !== 'symbol') {
+            parts.push(`${k}=${JSON.stringify(r[k])}`);
+        }
+    }
+    return parts.length ? parts.join(' | ') : String(reason);
+}
+
+process.on('unhandledRejection', (reason) => {
+    console.error('\n❌ Unhandled rejection:', describeError(reason));
+    process.exit(1);
+});
+
+process.on('uncaughtException', (err) => {
+    console.error('\n❌ Uncaught exception:', describeError(err));
+    process.exit(1);
+});
+
 function printResults(adapterName: string, events: NormalizedEvent[]) {
     console.log(`\n${'='.repeat(50)}`);
     console.log(`  ${adapterName}: ${events.length} event(s)`);

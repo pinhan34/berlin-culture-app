@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import type { Event } from '@/lib/types';
-import { getVenueCategory, CATEGORY_STYLES } from '@/lib/venueCategories';
+import { getVenueCategory, CATEGORY_STYLES, getVenueDisplayName } from '@/lib/venueCategories';
 import { downloadICS, buildGoogleCalendarUrl, buildOutlookUrl } from '@/lib/ics';
 import { trackInteraction } from '@/lib/interactions';
 
@@ -59,14 +59,8 @@ interface Props {
   onFavouriteToggle?: (id: number) => void;
 }
 
-// Display name overrides — lets us show a friendlier name without touching the DB
-const VENUE_DISPLAY_NAMES: Record<number, string> = {
-  2: 'ND Community',        // MeetUp: berlin-neurodivergent-community
-  7: 'QUEER EVENTS Berlin', // Telegram: QUEER EVENTS Berlin group
-};
-
 export function EventCard({ event, highlight, isFavourited = false, onFavouriteToggle }: Props) {
-  const venueName = VENUE_DISPLAY_NAMES[event.venue_id] ?? event.venue?.name ?? `Venue #${event.venue_id}`;
+  const venueName = getVenueDisplayName(event.venue_id, event.venue?.name ?? `Venue #${event.venue_id}`);
   const category = getVenueCategory(event.venue_id);
   const style = CATEGORY_STYLES[category];
   const urgency = getUrgencyLabel(event.start_time);
@@ -103,17 +97,17 @@ export function EventCard({ event, highlight, isFavourited = false, onFavouriteT
           <h3 className={`text-[15px] font-semibold leading-snug line-clamp-2 ${hasLink ? 'group-hover:text-fuchsia-600 dark:group-hover:text-fuchsia-400' : ''} text-stone-900 dark:text-stone-100`}>
             {event.title}
           </h3>
-          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-stone-500 dark:text-stone-400">
-            <span className="inline-flex items-center gap-1">
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span className="inline-flex items-center gap-1 text-sm font-medium text-fuchsia-700 dark:text-fuchsia-400">
               <CalendarIcon />
               {formatDate(event.start_time)}
             </span>
-            <span className="inline-flex items-center gap-1">
+            <span className="inline-flex items-center gap-1 text-sm text-stone-500 dark:text-stone-400">
               <ClockIcon />
               {formatTime(event.start_time)}
             </span>
             {event.duration && (
-              <span className="text-stone-400 dark:text-stone-500">
+              <span className="text-xs text-stone-400 dark:text-stone-500">
                 {formatDuration(event.duration)}
               </span>
             )}

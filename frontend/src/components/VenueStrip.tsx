@@ -1,6 +1,6 @@
 import type { Venue } from '@/lib/types';
 import { getVenueIdentity, IDENTITY_TAG_STYLES, IDENTITY_TAG_LABELS } from '@/lib/venueIdentity';
-import { getVenueCategory, CATEGORY_STYLES } from '@/lib/venueCategories';
+import { getVenueCategory, CATEGORY_STYLES, getVenueDisplayName } from '@/lib/venueCategories';
 
 interface Props {
   venues: Venue[];
@@ -33,7 +33,7 @@ export function VenueStrip({ venues }: Props) {
                 <span className="text-base">{identity.emoji}</span>
               )}
               <span className="text-sm font-medium text-stone-700 dark:text-stone-300">
-                {v.name}
+                {getVenueDisplayName(v.id, v.name)}
               </span>
               {v.source_type === 'personal' && (
                 <span className="rounded bg-amber-100 px-1 text-[10px] font-semibold text-amber-700 dark:bg-amber-900/40 dark:text-amber-400">

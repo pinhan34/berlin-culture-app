@@ -142,7 +142,7 @@ export class ResidentAdvisorAdapter implements WebsiteAdapter {
                     title: event.title,
                     start_time: new Date(startTime).toISOString(),
                     duration,
-                    event_url: eventUrl,
+                    event_url: eventUrl as string | null,
                 };
             })
             .filter((e): e is NormalizedEvent => e !== null && !!e.title && !!e.start_time);

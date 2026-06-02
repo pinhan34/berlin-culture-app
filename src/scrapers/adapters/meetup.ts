@@ -161,7 +161,7 @@ export class MeetUpAdapter implements WebsiteAdapter {
                     title: node.title,
                     start_time: new Date(node.dateTime).toISOString(),
                     duration,
-                    event_url: node.eventUrl,
+                    event_url: (node.eventUrl as string | null) ?? null,
                 };
             })
             .filter((e): e is NormalizedEvent => !!e.title && !!e.start_time);

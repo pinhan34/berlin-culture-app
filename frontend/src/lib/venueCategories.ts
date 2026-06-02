@@ -18,6 +18,19 @@ export function getVenueCategory(venueId: number): VenueCategory {
   return VENUE_CATEGORY_MAP[venueId] ?? 'community';
 }
 
+/**
+ * Override the raw database venue name with a more descriptive display name.
+ * Used in VenueStrip, VenueFilter, and EventCard.
+ */
+const VENUE_DISPLAY_NAME_MAP: Record<number, string> = {
+  2: 'ND Community',             // MeetUp: berlin-neurodivergent-community
+  7: 'QUEER EVENTS Berlin',      // Telegram group
+};
+
+export function getVenueDisplayName(venueId: number, dbName: string): string {
+  return VENUE_DISPLAY_NAME_MAP[venueId] ?? dbName;
+}
+
 export const CATEGORY_STYLES: Record<VenueCategory, { bg: string; text: string; border: string; label: string }> = {
   art: {
     bg: 'bg-teal-50 dark:bg-teal-950/40',

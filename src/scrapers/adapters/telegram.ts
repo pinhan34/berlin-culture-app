@@ -35,7 +35,8 @@ const GERMAN_DATE_NO_YEAR_RE = /(\d{1,2})\.(\d{1,2})\.?(?!\d)/;
 const ENGLISH_DATE_RE = /(\d{1,2})(?:st|nd|rd|th)?\s+(?:of\s+)?([A-Za-zä]+)\s+(\d{4})/;
 const ENGLISH_DATE_RE2 = /([A-Za-zä]+)\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})/;
 // English/German date without year: "4th of June", "June 4", "4. Juni", "4 Juni", "Juni 4"
-const ENGLISH_DATE_NO_YEAR_RE = /(\d{1,2})(?:st|nd|rd|th)?\s+(?:of\s+)?([A-Za-zä]{3,})/;
+// "4th of June", "4. Juni", "4 Juni", "30. Mai" — dot after day number is optional
+const ENGLISH_DATE_NO_YEAR_RE = /(\d{1,2})(?:st|nd|rd|th)?\.?\s+(?:of\s+)?([A-Za-zä]{3,})/;
 const ENGLISH_DATE_NO_YEAR_RE2 = /([A-Za-zä]{3,})\s+(\d{1,2})(?:st|nd|rd|th)?(?!\d)/;
 // ISO date: 2026-05-24
 const ISO_DATE_RE = /(\d{4})-(\d{2})-(\d{2})/;
@@ -48,8 +49,10 @@ const RELATIVE_DAY_RE = /\b(morgen|übermorgen|tomorrow|today|heute)\b/i;
 const WEEKDAY_RE = /\b(?:this\s+|am\s+|nächsten?\s+)?(montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonntag|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i;
 
 // Event-signal keywords (at least one must be present alongside a date)
-const EVENT_SIGNALS_RE = /\b(event|veranstaltung|eintritt|tickets?|lineup|konzert|workshop|treffen|meetup|party|festival|ausstellung|exhibition|opening|vernissage|performance|show|live|dj|screening|debut|premiere|burlesque|cabaret|theater|theatre|reading|lecture|dance|dating|night|gig|concert|drag|queer|flinta|trans|pride|rave|disco|club|bar|gallery|art|music|film|cinema|kino)\b/i;
+const EVENT_SIGNALS_RE = /\b(event|veranstaltung|eintritt|lineup|konzert|workshop|treffen|meetup|party|festival|ausstellung|exhibition|opening|vernissage|performance|show|live|dj|screening|debut|premiere|burlesque|cabaret|theater|theatre|reading|lecture|dance|dating|night|gig|concert|drag|queer|flinta|trans|pride|rave|disco|club|bar|gallery|art|music|film|cinema|kino)\b/i;
 const CASUAL_SIGNALS_RE = /\b(wer kommt|anyone coming|kommt jemand|join us|kommt ihr|come join|wanna go|let'?s go|einlass|doors?\s+open|starts?\s+at|ab\s+\d{1,2}\s*uhr)\b/i;
+// First-person messages about tickets/plans that are NOT event announcements
+const PERSONAL_MESSAGE_RE = /\b(i have|i'm|i am|i need|ich habe|ich bin|ich suche|ich verkaufe|selling my|give away|giving away|my ticket|mein ticket|looking for .{0,20}ticket|suche .{0,20}ticket|verschenke|habe leider|leider kann ich)\b/i;
 const URL_RE = /https?:\/\/\S+/;
 
 interface ParsedDate {
@@ -61,6 +64,24 @@ interface ParsedDate {
 interface ParsedTime {
     hour: string;
     minute: string;
+}
+
+/**
+ * GramJS throws non-standard null-prototype objects as errors.
+ * This extracts a human-readable message from them.
+ */
+function extractGramError(err: unknown): string {
+    if (!err) return 'unknown error';
+    if (typeof err === 'string') return err;
+    if (err instanceof Error) return err.message;
+    const e = err as Record<string, unknown>;
+    return (
+        (e['errorMessage'] as string) ??
+        (e['message'] as string) ??
+        (e['code'] ? `error code ${e['code']}` : null) ??
+        JSON.stringify(err, Object.getOwnPropertyNames(err as object)) ??
+        String(err)
+    );
 }
 
 export class TelegramGroupAdapter implements WebsiteAdapter {
@@ -93,7 +114,13 @@ export class TelegramGroupAdapter implements WebsiteAdapter {
             connectionRetries: 3,
         });
 
-        await client.connect();
+        try {
+            await client.connect();
+        } catch (err: unknown) {
+            const msg = extractGramError(err);
+            console.error(`[${this.sourceName}] Failed to connect to Telegram: ${msg}`);
+            return [];
+        }
         console.log(`[${this.sourceName}] Connected to Telegram.`);
 
         const allEvents: NormalizedEvent[] = [];
@@ -105,7 +132,7 @@ export class TelegramGroupAdapter implements WebsiteAdapter {
                     allEvents.push(...events);
                     console.log(`[${this.sourceName}][${groupId}] Extracted ${events.length} events.`);
                 } catch (error) {
-                    console.error(`[${this.sourceName}][${groupId}] Group scrape failed:`, error);
+                    console.error(`[${this.sourceName}][${groupId}] Group scrape failed: ${extractGramError(error)}`);
                 }
             }
 
@@ -230,6 +257,10 @@ export class TelegramGroupAdapter implements WebsiteAdapter {
         // Tier 1: structured (date + event signal or URL)
         // Tier 2: casual (date + casual phrase)
         if (!hasEventSignal && !hasUrl && !hasCasualSignal) return null;
+
+        // Reject personal messages like "I have to give away my ticket" —
+        // they have a date + keyword but are not event announcements.
+        if (PERSONAL_MESSAGE_RE.test(text) && !hasUrl) return null;
 
         const time = this.parseTime(text);
         const title = this.extractTitle(text);
@@ -441,42 +472,62 @@ export class TelegramGroupAdapter implements WebsiteAdapter {
     }
 
     private extractTitle(text: string): string {
-        // Remove URLs for cleaner title extraction
+        // Remove URLs and leading/trailing whitespace
         const clean = text.replace(URL_RE, '').trim();
         const lines = clean.split('\n').map(l => l.trim()).filter(l => l.length > 0);
 
-        // Patterns that indicate a line is promotional noise rather than an event title
-        const PROMO_LINE_RE = /^\d+\s*(?:€|euro|eur)\b/i;          // "15 Euro", "€10"
-        const DATE_ONLY_RE = /^\d{1,2}[.:]\d{1,2}/;                // "24.05" or "20:00"
-        const EMOJI_NOISE_RE = /^[\p{Emoji}\s]+$/u;                 // line is just emojis
-        const SHORT_CAPS_RE = /^[A-Z0-9\s€!]{2,30}$/;             // "FREE ENTRY", "SOLD OUT"
+        // Lines that are definitely NOT the event title
+        const PROMO_RE   = /^\d+\s*(?:€|euro|eur)\b/i;        // "15 Euro", "€10"
+        const DATE_RE    = /^\d{1,2}[.:]\d{1,2}/;              // "24.05" or "20:00"
+        const EMOJI_RE   = /^[\p{Emoji}\s]+$/u;                // line is only emojis
+        const FIRST_PERSON_RE = /^(i |ich |i'm |I'm )/i;      // personal lines
+        // Very long lines are descriptions, not titles
+        const TOO_LONG   = 90;
 
-        function isNoiseLine(line: string): boolean {
+        function isNoise(line: string): boolean {
             return (
-                PROMO_LINE_RE.test(line) ||
-                DATE_ONLY_RE.test(line) ||
-                EMOJI_NOISE_RE.test(line) ||
-                SHORT_CAPS_RE.test(line)
+                PROMO_RE.test(line) ||
+                DATE_RE.test(line) ||
+                EMOJI_RE.test(line) ||
+                FIRST_PERSON_RE.test(line) ||
+                line.length > TOO_LONG
             );
         }
 
-        // Walk lines until we find one that looks like a real title
-        let title = '';
-        for (const line of lines) {
-            if (!isNoiseLine(line) && line.length >= 5) {
-                title = line;
-                break;
-            }
+        // Scoring: prefer lines that look like event names
+        function titleScore(line: string): number {
+            let score = 0;
+            // ALL-CAPS words (e.g. "CONTROL FREAK", "REVOLTROUGE") → strong signal
+            const words = line.split(/\s+/);
+            const capsWords = words.filter(w => w.length > 1 && w === w.toUpperCase() && /[A-Z]/.test(w));
+            if (capsWords.length >= 2) score += 10;
+            else if (capsWords.length === 1 && words.length <= 4) score += 5;
+            // Short lines with proper capitalization → likely a title
+            if (line.length <= 50 && /^[A-ZÄÖÜ\d"'(«]/.test(line)) score += 3;
+            // Starts with emoji followed by text → often the event headline
+            if (/^[\p{Emoji}]/u.test(line) && line.replace(/^[\p{Emoji}\s]+/u, '').length > 3) score += 2;
+            // Penalty for lines that look like sentences (lowercase start, punctuation at end)
+            if (/^[a-z]/.test(line)) score -= 4;
+            if (/[.!?]$/.test(line) && line.length > 40) score -= 2;
+            return score;
         }
 
-        // Fall back to first line if nothing better was found
-        if (!title) title = lines[0] ?? '';
+        const candidates = lines.filter(l => !isNoise(l) && l.length >= 3);
+
+        // Pick the highest-scoring candidate
+        let best = candidates[0] ?? lines[0] ?? '';
+        let bestScore = titleScore(best);
+        for (const line of candidates.slice(1)) {
+            const s = titleScore(line);
+            if (s > bestScore) { best = line; bestScore = s; }
+        }
+
+        // Strip leading emoji characters from the chosen title
+        best = best.replace(/^[\p{Emoji}\s]+/u, '').trim() || best.trim();
 
         // Trim to reasonable length
-        if (title.length > 120) {
-            title = title.substring(0, 117) + '...';
-        }
+        if (best.length > 120) best = best.substring(0, 117) + '...';
 
-        return title;
+        return best;
     }
 }
