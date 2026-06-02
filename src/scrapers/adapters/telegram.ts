@@ -67,6 +67,67 @@ interface ParsedTime {
 }
 
 /**
+ * Fetch page metadata (title + venue) from an event URL.
+ * Tries JSON-LD structured data first, then Open Graph tags.
+ * Returns empty object on any error so callers can fall back gracefully.
+ */
+async function fetchEventMeta(url: string): Promise<{ title?: string; venue?: string }> {
+    try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 6000);
+        const res = await fetch(url, {
+            signal: controller.signal,
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (compatible; BerlinCultureBot/1.0)',
+                'Accept': 'text/html',
+            },
+        });
+        clearTimeout(timeout);
+        if (!res.ok) return {};
+        const html = await res.text();
+
+        // 1. JSON-LD structured data (RA, Eventbrite, many others)
+        const ldMatches = html.matchAll(/<script[^>]+type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi);
+        for (const m of ldMatches) {
+            try {
+                const items = JSON.parse(m[1]!);
+                const list = Array.isArray(items) ? items : [items];
+                for (const item of list) {
+                    if (/^(Music)?Event$/i.test(item['@type'] ?? '')) {
+                        const venue = item.location?.name
+                            ?? item.location?.address?.name
+                            ?? undefined;
+                        const title = typeof item.name === 'string' ? item.name.trim() : undefined;
+                        if (title) return { title, venue };
+                    }
+                }
+            } catch { /* malformed JSON — skip */ }
+        }
+
+        // 2. Open Graph title
+        const og = html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i)
+                ?? html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:title["']/i);
+        if (og?.[1]) {
+            // Strip trailing " | Site Name" suffixes common on RA, Eventbrite, etc.
+            const title = og[1]
+                .replace(/\s*[|\u2013\u2014-]\s*(Resident Advisor|RA|Eventbrite|Facebook|Instagram).*$/i, '')
+                .trim();
+            return { title };
+        }
+
+        // 3. HTML <title> as last resort
+        const htmlTitle = html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1];
+        if (htmlTitle) {
+            const title = htmlTitle
+                .replace(/\s*[|\u2013\u2014-]\s*(Resident Advisor|RA|Eventbrite|Facebook|Instagram).*$/i, '')
+                .trim();
+            return { title };
+        }
+    } catch { /* network error, timeout, redirect loop — fall back silently */ }
+    return {};
+}
+
+/**
  * GramJS throws non-standard null-prototype objects as errors.
  * This extracts a human-readable message from them.
  */
@@ -242,8 +303,27 @@ export class TelegramGroupAdapter implements WebsiteAdapter {
             if (batch.length < 100) break;
         }
 
-        console.log(`[${this.sourceName}] Found ${results.length} events in "${groupName}".`);
-        return results;
+        console.log(`[${this.sourceName}] Found ${results.length} raw events in "${groupName}". Enriching from URLs...`);
+
+        // Enrich events that have external URLs: fetch page metadata to get the
+        // real event title and venue name instead of the Telegram message text.
+        const enriched = await Promise.all(
+            results.map(async e => {
+                if (!e.event_url) return e;
+                const meta = await fetchEventMeta(e.event_url);
+                return {
+                    ...e,
+                    title: meta.title ?? e.title,
+                    // Append venue if we found one and it's not already in the title
+                    ...(meta.venue && !e.title.toLowerCase().includes(meta.venue.toLowerCase())
+                        ? { title: `${meta.title ?? e.title} @ ${meta.venue}` }
+                        : {}),
+                };
+            })
+        );
+
+        console.log(`[${this.sourceName}] Enrichment done. Returning ${enriched.length} events.`);
+        return enriched;
     }
 
     private extractEvent(text: string, groupName: string): NormalizedEvent | null {
