@@ -79,11 +79,19 @@ const TELEGRAM_VENUE_ID = 7;
 /** Titles that are clearly promotional noise rather than event names. */
 const PROMO_TITLE_RE = /^\d+\s*(?:€|euro|eur)\b/i;
 
+/**
+ * Conversational / personal-message openers — titles starting with these
+ * are group chat messages, not events (e.g. "Hey Lovelies, i have a ticket…")
+ */
+const PERSONAL_TITLE_RE = /^(hey\b|hi\b|hallo\b|hello\b|i have\b|i'm\b|i am\b|ich habe\b|ich bin\b|ich suche\b|selling\b|give away\b|giving away\b|does anyone\b|anyone\b|wer hat\b|wer kennt\b|suche\b|verschenke\b|leider\b)/i;
+
 function isQualityEvent(e: Event): boolean {
   // Block old t.me fallback URLs already in the DB (new scraper stores null instead)
   if (e.event_url?.startsWith('https://t.me/')) return false;
   // Drop events with obviously promotional titles (e.g. "15 € UNTIL MONDAY ONLY")
   if (PROMO_TITLE_RE.test(e.title)) return false;
+  // Drop personal/conversational messages that slipped into the DB
+  if (PERSONAL_TITLE_RE.test(e.title)) return false;
   return true;
 }
 
