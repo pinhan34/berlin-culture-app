@@ -80,10 +80,8 @@ const TELEGRAM_VENUE_ID = 7;
 const PROMO_TITLE_RE = /^\d+\s*(?:€|euro|eur)\b/i;
 
 function isQualityEvent(e: Event): boolean {
-  if (e.venue_id === TELEGRAM_VENUE_ID) {
-    // Only show Telegram events that link to a real external page
-    if (!e.event_url || e.event_url.startsWith('https://t.me/')) return false;
-  }
+  // Block old t.me fallback URLs already in the DB (new scraper stores null instead)
+  if (e.event_url?.startsWith('https://t.me/')) return false;
   // Drop events with obviously promotional titles (e.g. "15 € UNTIL MONDAY ONLY")
   if (PROMO_TITLE_RE.test(e.title)) return false;
   return true;

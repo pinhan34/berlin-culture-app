@@ -3,12 +3,18 @@ import { StringSession } from 'telegram/sessions/index.js';
 import type { WebsiteAdapter, NormalizedEvent } from '../interfaces.js';
 
 const MONTHS: Record<string, string> = {
+    // English
     january: '01', february: '02', march: '03', april: '04',
     may: '05', june: '06', july: '07', august: '08',
     september: '09', october: '10', november: '11', december: '12',
-    januar: '01', februar: '02', märz: '03', april_de: '04',
-    mai: '05', juni: '06', juli: '07', august_de: '08',
-    oktober: '10', november_de: '11', dezember: '12',
+    // German (same spelling as English for some)
+    januar: '01', februar: '02', märz: '03',
+    mai: '05', juni: '06', juli: '07',
+    oktober: '10', dezember: '12',
+    // Short abbreviations (German & English)
+    jan: '01', feb: '02', mär: '03', mar: '03', apr: '04',
+    jun: '06', jul: '07', aug: '08', sep: '09', okt: '10', oct: '10',
+    nov: '11', dez: '12', dec: '12',
 };
 
 const GERMAN_DAYS: Record<string, number> = {
@@ -21,11 +27,16 @@ const ENGLISH_DAYS: Record<string, number> = {
     friday: 5, saturday: 6, sunday: 0,
 };
 
-// German date: 24.05.2026 or 24.5.2026
+// German date: 24.05.2026 or 24.5.2026 (with year)
 const GERMAN_DATE_RE = /(\d{1,2})\.(\d{1,2})\.(\d{4})/;
-// English date: 24th of May 2026, May 24 2026, May 24, 2026
+// German date: 24.05 or 24.5 (without year)
+const GERMAN_DATE_NO_YEAR_RE = /(\d{1,2})\.(\d{1,2})\.?(?!\d)/;
+// English date: 24th of May 2026, May 24 2026, May 24, 2026 (with year)
 const ENGLISH_DATE_RE = /(\d{1,2})(?:st|nd|rd|th)?\s+(?:of\s+)?([A-Za-zä]+)\s+(\d{4})/;
 const ENGLISH_DATE_RE2 = /([A-Za-zä]+)\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})/;
+// English/German date without year: "4th of June", "June 4", "4. Juni", "4 Juni", "Juni 4"
+const ENGLISH_DATE_NO_YEAR_RE = /(\d{1,2})(?:st|nd|rd|th)?\s+(?:of\s+)?([A-Za-zä]{3,})/;
+const ENGLISH_DATE_NO_YEAR_RE2 = /([A-Za-zä]{3,})\s+(\d{1,2})(?:st|nd|rd|th)?(?!\d)/;
 // ISO date: 2026-05-24
 const ISO_DATE_RE = /(\d{4})-(\d{2})-(\d{2})/;
 // Time: 20:00, 8pm, 20 Uhr
@@ -37,7 +48,7 @@ const RELATIVE_DAY_RE = /\b(morgen|übermorgen|tomorrow|today|heute)\b/i;
 const WEEKDAY_RE = /\b(?:this\s+|am\s+|nächsten?\s+)?(montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonntag|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i;
 
 // Event-signal keywords (at least one must be present alongside a date)
-const EVENT_SIGNALS_RE = /\b(event|veranstaltung|eintritt|tickets?|lineup|konzert|workshop|treffen|meetup|party|festival|ausstellung|exhibition|opening|vernissage|performance|show|live|dj|screening)\b/i;
+const EVENT_SIGNALS_RE = /\b(event|veranstaltung|eintritt|tickets?|lineup|konzert|workshop|treffen|meetup|party|festival|ausstellung|exhibition|opening|vernissage|performance|show|live|dj|screening|debut|premiere|burlesque|cabaret|theater|theatre|reading|lecture|dance|dating|night|gig|concert|drag|queer|flinta|trans|pride|rave|disco|club|bar|gallery|art|music|film|cinema|kino)\b/i;
 const CASUAL_SIGNALS_RE = /\b(wer kommt|anyone coming|kommt jemand|join us|kommt ihr|come join|wanna go|let'?s go|einlass|doors?\s+open|starts?\s+at|ab\s+\d{1,2}\s*uhr)\b/i;
 const URL_RE = /https?:\/\/\S+/;
 
@@ -59,7 +70,7 @@ export class TelegramGroupAdapter implements WebsiteAdapter {
     private groupIds: string[];
     private lookbackDays: number;
 
-    constructor(venueId: number, groupIds: string[], lookbackDays = 7) {
+    constructor(venueId: number, groupIds: string[], lookbackDays = 30) {
         this.venueId = venueId;
         this.groupIds = groupIds;
         this.lookbackDays = lookbackDays;
@@ -166,33 +177,45 @@ export class TelegramGroupAdapter implements WebsiteAdapter {
         }
         console.log(`[${this.sourceName}] Fetching messages from "${groupName}" (last ${this.lookbackDays} days)...`);
 
-        const messages = await client.getMessages(peer, {
-            limit: 200,
-            offsetDate: Math.floor(Date.now() / 1000),
-        });
-
+        const cutoffUnix = Math.floor(cutoff.getTime() / 1000);
         const results: NormalizedEvent[] = [];
         const seen = new Set<string>();
+        let offsetId = 0;
 
-        for (const msg of messages) {
-            if (!(msg instanceof Api.Message)) continue;
+        // Paginate in batches of 100 until we go past the cutoff date
+        outer: while (true) {
+            const batch = await client.getMessages(peer, {
+                limit: 100,
+                ...(offsetId ? { offsetId } : { offsetDate: Math.floor(Date.now() / 1000) }),
+            });
 
-            const msgDate = new Date(msg.date * 1000);
-            if (msgDate < cutoff) continue;
+            if (!batch.length) break;
 
-            const text = msg.message ?? '';
-            if (text.length < 10) continue;
+            for (const msg of batch) {
+                if (!(msg instanceof Api.Message)) continue;
 
-            const event = this.extractEvent(text, groupName);
-            if (!event) continue;
+                if (msg.date < cutoffUnix) break outer;
 
-            const key = `${event.title}|${event.start_time}`;
-            if (seen.has(key)) continue;
-            seen.add(key);
+                offsetId = msg.id;
 
-            results.push(event);
+                const text = msg.message ?? '';
+                if (text.length < 10) continue;
+
+                const event = this.extractEvent(text, groupName);
+                if (!event) continue;
+
+                const key = `${event.title}|${event.start_time}`;
+                if (seen.has(key)) continue;
+                seen.add(key);
+
+                results.push(event);
+            }
+
+            // If the batch was smaller than requested, we've reached the beginning
+            if (batch.length < 100) break;
         }
 
+        console.log(`[${this.sourceName}] Found ${results.length} events in "${groupName}".`);
         return results;
     }
 
@@ -226,19 +249,35 @@ export class TelegramGroupAdapter implements WebsiteAdapter {
 
         const urlMatch = text.match(URL_RE);
         const externalUrl = urlMatch?.[0];
-
-        // Only keep messages that link to a real event page (not just the group itself).
-        // Promo-only messages ("15 € until Monday") have no external link and should not
-        // become events — they have no event page to send the user to.
-        if (!externalUrl || externalUrl.startsWith('https://t.me/')) return null;
+        // Use the external URL if it's a real event page; otherwise null.
+        // t.me group links are useless (require login), so we store null instead.
+        const eventUrl =
+            externalUrl && !externalUrl.startsWith('https://t.me/')
+                ? externalUrl
+                : null;
 
         return {
             venue_id: this.venueId,
             title,
             start_time: startTime,
             duration: null,
-            event_url: externalUrl,
+            event_url: eventUrl,
         };
+    }
+
+    /**
+     * Given a month (1-12) and day, infer the year.
+     * Use the current year unless the date is more than 2 days in the past,
+     * in which case assume next year (handles posts written in late December
+     * about January events).
+     */
+    private inferYear(month: number, day: number): string {
+        const now = new Date();
+        const candidate = new Date(now.getFullYear(), month - 1, day);
+        if (candidate.getTime() < now.getTime() - 2 * 24 * 60 * 60 * 1000) {
+            return String(now.getFullYear() + 1);
+        }
+        return String(now.getFullYear());
     }
 
     private parseDate(text: string): ParsedDate | null {
@@ -252,7 +291,7 @@ export class TelegramGroupAdapter implements WebsiteAdapter {
             };
         }
 
-        // German: 24.05.2026
+        // German with year: 24.05.2026
         const germanMatch = text.match(GERMAN_DATE_RE);
         if (germanMatch) {
             return {
@@ -262,7 +301,7 @@ export class TelegramGroupAdapter implements WebsiteAdapter {
             };
         }
 
-        // English: "24th of May 2026" or "May 24, 2026"
+        // English with year: "24th of May 2026" or "May 24, 2026"
         const engMatch = text.match(ENGLISH_DATE_RE);
         if (engMatch) {
             const monthName = (engMatch[2] ?? '').toLowerCase();
@@ -285,6 +324,49 @@ export class TelegramGroupAdapter implements WebsiteAdapter {
                     day: (engMatch2[2] ?? '').padStart(2, '0'),
                     month,
                     year: engMatch2[3] ?? '',
+                };
+            }
+        }
+
+        // English/German WITHOUT year: "4th of June", "June 4", "4. Juni", "4 Juni"
+        const engNoYear = text.match(ENGLISH_DATE_NO_YEAR_RE);
+        if (engNoYear) {
+            const monthName = (engNoYear[2] ?? '').toLowerCase();
+            const month = MONTHS[monthName];
+            if (month) {
+                const day = Number(engNoYear[1] ?? 0);
+                return {
+                    day: String(day).padStart(2, '0'),
+                    month,
+                    year: this.inferYear(Number(month), day),
+                };
+            }
+        }
+
+        const engNoYear2 = text.match(ENGLISH_DATE_NO_YEAR_RE2);
+        if (engNoYear2) {
+            const monthName = (engNoYear2[1] ?? '').toLowerCase();
+            const month = MONTHS[monthName];
+            if (month) {
+                const day = Number(engNoYear2[2] ?? 0);
+                return {
+                    day: String(day).padStart(2, '0'),
+                    month,
+                    year: this.inferYear(Number(month), day),
+                };
+            }
+        }
+
+        // German without year: "4.6" or "04.06"
+        const germanNoYear = text.match(GERMAN_DATE_NO_YEAR_RE);
+        if (germanNoYear) {
+            const day = Number(germanNoYear[1] ?? 0);
+            const month = Number(germanNoYear[2] ?? 0);
+            if (day >= 1 && day <= 31 && month >= 1 && month <= 12) {
+                return {
+                    day: String(day).padStart(2, '0'),
+                    month: String(month).padStart(2, '0'),
+                    year: this.inferYear(month, day),
                 };
             }
         }

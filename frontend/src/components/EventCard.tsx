@@ -81,18 +81,17 @@ export function EventCard({ event, highlight, isFavourited = false, onFavouriteT
     trackInteraction(event.id, 'click');
   }
 
-  return (
-    <a
-      href={event.event_url ?? '#'}
-      target="_blank"
-      rel="noopener noreferrer"
-      onClick={handleCardClick}
-      className={`group relative block rounded-xl border p-5 transition-all hover:shadow-md ${
-        highlight
-          ? 'border-fuchsia-300 bg-fuchsia-50/50 ring-1 ring-fuchsia-200 dark:border-fuchsia-700 dark:bg-fuchsia-950/30 dark:ring-fuchsia-800'
-          : 'border-stone-200 bg-white hover:border-stone-400 dark:border-purple-900/40 dark:bg-[#16101e] dark:hover:border-purple-700/60'
-      }`}
-    >
+  const hasLink = !!event.event_url;
+  const cardClass = `group relative block rounded-xl border p-5 transition-all ${
+    hasLink ? 'hover:shadow-md' : 'cursor-default opacity-90'
+  } ${
+    highlight
+      ? 'border-fuchsia-300 bg-fuchsia-50/50 ring-1 ring-fuchsia-200 dark:border-fuchsia-700 dark:bg-fuchsia-950/30 dark:ring-fuchsia-800'
+      : 'border-stone-200 bg-white hover:border-stone-400 dark:border-purple-900/40 dark:bg-[#16101e] dark:hover:border-purple-700/60'
+  }`;
+
+  const inner = (
+    <>
       {urgency && (
         <span className="absolute -top-2.5 right-3 inline-block rounded-full bg-pink-500 px-2.5 py-0.5 text-[11px] font-bold text-white shadow-sm dark:bg-pink-400">
           {urgency}
@@ -101,10 +100,9 @@ export function EventCard({ event, highlight, isFavourited = false, onFavouriteT
 
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <h3 className="text-[15px] font-semibold leading-snug text-stone-900 group-hover:text-fuchsia-600 dark:text-stone-100 dark:group-hover:text-fuchsia-400 line-clamp-2">
+          <h3 className={`text-[15px] font-semibold leading-snug line-clamp-2 ${hasLink ? 'group-hover:text-fuchsia-600 dark:group-hover:text-fuchsia-400' : ''} text-stone-900 dark:text-stone-100`}>
             {event.title}
           </h3>
-
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-stone-500 dark:text-stone-400">
             <span className="inline-flex items-center gap-1">
               <CalendarIcon />
@@ -121,8 +119,7 @@ export function EventCard({ event, highlight, isFavourited = false, onFavouriteT
             )}
           </div>
         </div>
-
-        <ArrowIcon />
+        {hasLink && <ArrowIcon />}
       </div>
 
       <div className="mt-3 flex items-center justify-between">
@@ -130,11 +127,12 @@ export function EventCard({ event, highlight, isFavourited = false, onFavouriteT
           <span className={`inline-block rounded-md border px-2 py-0.5 text-xs font-medium ${style.bg} ${style.text} ${style.border}`}>
             {venueName}
           </span>
+          {!hasLink && (
+            <span className="text-[10px] text-stone-400 dark:text-stone-500">no link available</span>
+          )}
         </div>
-
         <div className="flex items-center gap-2">
           <CalendarDropdown event={event} />
-
           <button
             onClick={handleFavouriteClick}
             title={isFavourited ? 'Remove from favourites' : 'Save to favourites'}
@@ -148,9 +146,24 @@ export function EventCard({ event, highlight, isFavourited = false, onFavouriteT
           </button>
         </div>
       </div>
+    </>
+  );
+
+  return hasLink ? (
+    <a
+      href={event.event_url!}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={handleCardClick}
+      className={cardClass}
+    >
+      {inner}
     </a>
+  ) : (
+    <div className={cardClass}>{inner}</div>
   );
 }
+
 
 function CalendarDropdown({ event }: { event: Event }) {
   const [open, setOpen] = useState(false);

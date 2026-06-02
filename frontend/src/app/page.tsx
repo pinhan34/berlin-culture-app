@@ -52,7 +52,7 @@ export default async function Home() {
           What&apos;s happening in Berlin
         </h2>
         <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">
-          Hand-picked from {venues.length}{' '}of Berlin&apos;s best indie + queer + ND-friendly spaces and communities
+          Hand-picked from Berlin's best indie + queer + ND-friendly spaces and communities
         </p>
         <a
           href="/api/calendar"

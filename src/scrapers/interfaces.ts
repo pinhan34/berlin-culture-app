@@ -8,7 +8,7 @@ export interface NormalizedEvent {
     title: string;         // The clean name of the movie, concert, or performance
     start_time: string;    // Standardized ISO string timestamp (e.g., 2026-05-24T20:00:00Z)
     duration: string | null; // A text representation of time block matching Postgres intervals (e.g., '1 hour 30 mins')
-    event_url: string;     // Direct link to the specific event booking page
+    event_url: string | null; // Direct link to the specific event booking page (null if no external link)
 }
 
 /**
