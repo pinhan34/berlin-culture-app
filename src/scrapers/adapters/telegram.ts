@@ -72,7 +72,16 @@ interface ParsedTime {
  * Google Maps is a location, not an event.
  * Unknown domains may or may not work — we try them but don't require success.
  */
-const BLOCKED_DOMAINS = ['instagram.com', 'www.instagram.com', 'facebook.com', 'www.facebook.com', 'fb.me', 'maps.google.com', 'goo.gl', 'maps.app.goo.gl'];
+// Any URL from these domains cannot produce a clean event title.
+// We block enrichment AND require isTitleClean to pass on the Telegram text.
+// Patterns are matched as substrings of the full URL string.
+const BLOCKED_URL_PATTERNS = [
+    'instagram.com', 'facebook.com', 'fb.me',
+    'maps.google.com', 'google.com/maps', 'maps.app.goo.gl', 'goo.gl/maps',
+    'goo.gl', // short redirect — could go anywhere, too risky
+];
+// Keep old name as alias for fetchEventMeta (which still uses it)
+const BLOCKED_DOMAINS = ['instagram.com', 'www.instagram.com', 'facebook.com', 'www.facebook.com', 'fb.me', 'maps.google.com', 'goo.gl', 'maps.app.goo.gl', 'google.com'];
 const RELIABLE_DOMAINS = ['ra.co', 'www.ra.co', 'eventbrite.com', 'www.eventbrite.com', 'eventbrite.de', 'eventbrite.co.uk', 'dice.fm', 'www.dice.fm', 'tickets.de', 'koka36.de', 'schwuz.de'];
 
 /**
@@ -149,14 +158,22 @@ async function fetchEventMeta(url: string): Promise<{ title?: string; venue?: st
 function isTitleClean(title: string): boolean {
     const t = title.trim();
     if (t.length < 5) return false;
+
     // Conversational / personal openers that are never event titles
     const JUNK_START = /^(hi\b|hey\b|hallo\b|hello\b|dear\b|come\b|join\b|book\b|get\b|grab\b|save\b|buy\b|register\b|sign\b|liebe|lieber|i have\b|i got\b|i['']m\b|i am\b|would\b|could\b|looking\b|selling\b|give\b|suche\b|verschenke\b|ich\b|wer\b|does\b|anyone\b|google\b|instagram\b|facebook\b|this (monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b)/i;
     if (JUNK_START.test(t)) return false;
+
+    // Titles that contain known non-event strings anywhere inside them
+    const JUNK_CONTAINS = /\bgoogle maps\b|\binstagram\b|\bfacebook\b|\bwhatsapp\b|\btelegram\b|\b€\s*only\b|\bparty tip\b|\bbook your spot\b|\bbook now\b|\bclick here\b|\blink in bio\b|\bswipe up\b/i;
+    if (JUNK_CONTAINS.test(t)) return false;
+
     // Title is just a weekday or relative date reference
     if (/^(today|tomorrow|morgen|heute|übermorgen|this week)\b/i.test(t)) return false;
-    // Titles shorter than 3 words that are all lowercase → likely a fragment
+
+    // Titles shorter than 2 words that are all lowercase → likely a fragment
     const words = t.split(/\s+/);
     if (words.length < 2 && t === t.toLowerCase()) return false;
+
     return true;
 }
 
@@ -346,7 +363,7 @@ export class TelegramGroupAdapter implements WebsiteAdapter {
                 let finalTitle = e.title;
 
                 if (e.event_url) {
-                    const isBlockedUrl = BLOCKED_DOMAINS.some(d => e.event_url!.includes(d));
+                    const isBlockedUrl = BLOCKED_URL_PATTERNS.some(p => e.event_url!.includes(p));
                     if (!isBlockedUrl) {
                         const meta = await fetchEventMeta(e.event_url);
                         if (meta.title) {
