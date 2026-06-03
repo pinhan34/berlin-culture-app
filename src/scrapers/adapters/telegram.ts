@@ -84,6 +84,19 @@ const BLOCKED_URL_PATTERNS = [
 const BLOCKED_DOMAINS = ['instagram.com', 'www.instagram.com', 'facebook.com', 'www.facebook.com', 'fb.me', 'maps.google.com', 'goo.gl', 'maps.app.goo.gl', 'google.com'];
 const RELIABLE_DOMAINS = ['ra.co', 'www.ra.co', 'eventbrite.com', 'www.eventbrite.com', 'eventbrite.de', 'eventbrite.co.uk', 'dice.fm', 'www.dice.fm', 'tickets.de', 'koka36.de', 'schwuz.de'];
 
+/** Decode common HTML entities so stored titles don't contain &quot; or &#x1f4ab; */
+function decodeHtmlEntities(s: string): string {
+    return s
+        .replace(/&amp;/g, '&')
+        .replace(/&quot;/g, '"')
+        .replace(/&#039;/g, "'")
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&#x[0-9a-f]+;/gi, '') // remove remaining hex entities (emoji etc.)
+        .replace(/&#\d+;/g, '')          // remove remaining decimal entities
+        .trim();
+}
+
 /**
  * Fetch page metadata (title + venue) from an event URL.
  * Returns { title, venue } on success, or {} if blocked/failed.
@@ -131,8 +144,7 @@ async function fetchEventMeta(url: string): Promise<{ title?: string; venue?: st
         const og = html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i)
                 ?? html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:title["']/i);
         if (og?.[1]) {
-            // Strip trailing " | Site Name" suffixes common on RA, Eventbrite, etc.
-            const title = og[1]
+            const title = decodeHtmlEntities(og[1])
                 .replace(/\s*[|\u2013\u2014-]\s*(Resident Advisor|RA|Eventbrite|Facebook|Instagram).*$/i, '')
                 .trim();
             return { title };
@@ -141,7 +153,7 @@ async function fetchEventMeta(url: string): Promise<{ title?: string; venue?: st
         // 3. HTML <title> as last resort
         const htmlTitle = html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1];
         if (htmlTitle) {
-            const title = htmlTitle
+            const title = decodeHtmlEntities(htmlTitle)
                 .replace(/\s*[|\u2013\u2014-]\s*(Resident Advisor|RA|Eventbrite|Facebook|Instagram).*$/i, '')
                 .trim();
             return { title };
@@ -159,16 +171,34 @@ function isTitleClean(title: string): boolean {
     const t = title.trim();
     if (t.length < 5) return false;
 
+    // Titles that are clearly cut off or are list introductions ("Here's what awaits you:")
+    if (t.endsWith(':') || t.endsWith('…') || t.endsWith('...')) return false;
+
+    // Cancelled / postponed events — no point showing them
+    if (/^(cancelled|abgesagt|postponed|verschoben)\b/i.test(t)) return false;
+
+    // Titles starting with a price/currency symbol — always promotional, never event names
+    // Note: \b doesn't work before non-word chars like €, so we use ^ directly
+    if (/^€/.test(t)) return false;                // "€ only", "€ UNTIL MONDAY ONLY"
+    if (/^\d+\s*[€£$]/.test(t)) return false;      // "45€ (NOTAFLOF)", "30$ tickets"
+
+    // Titles starting with a month/weekday name + time info — these are date announcements, not event names
+    if (/^(january|february|march|april|may|june|july|august|september|october|november|december|januar|februar|märz|mai|juni|juli|oktober|dezember|monday|tuesday|wednesday|thursday|friday|saturday|sunday|montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonntag)\b.{0,8}(\d|uhr|pm|am)/i.test(t)) return false;
+
     // Conversational / personal openers that are never event titles
-    const JUNK_START = /^(hi\b|hey\b|hallo\b|hello\b|dear\b|come\b|join\b|book\b|get\b|grab\b|save\b|buy\b|register\b|sign\b|liebe|lieber|i have\b|i got\b|i['']m\b|i am\b|would\b|could\b|looking\b|selling\b|give\b|suche\b|verschenke\b|ich\b|wer\b|does\b|anyone\b|google\b|instagram\b|facebook\b|this (monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b)/i;
+    const JUNK_START = /^(hi\b|hey\b|hallo\b|hello\b|dear\b|come\b|join\b|book\b|bring\b|few\b|get\b|grab\b|save\b|buy\b|register\b|sign\b|liebe|lieber|i have\b|i got\b|i['']m\b|i am\b|there are\b|would\b|could\b|looking\b|selling\b|give\b|suche\b|verschenke\b|ich\b|wer\b|does\b|anyone\b|google\b|instagram\b|facebook\b|euros\b|das erwartet|hier (ist|sind|findet|gibt)|this (monday|tuesday|wednesday|thursday|friday|saturday|sunday|evening|weekend)\b)/i;
     if (JUNK_START.test(t)) return false;
 
-    // Titles that contain known non-event strings anywhere inside them
-    const JUNK_CONTAINS = /\bgoogle maps\b|\binstagram\b|\bfacebook\b|\bwhatsapp\b|\btelegram\b|\b€\s*only\b|\bparty tip\b|\bbook your spot\b|\bbook now\b|\bclick here\b|\blink in bio\b|\bswipe up\b/i;
+    // Arrow / dash openers — lineup entries, not event names
+    if (/^[→←➡➜►•\-–—]\s/.test(t)) return false;
+
+    // Phrases that can appear anywhere in the title
+    // Note: avoid \b before non-word chars like €
+    const JUNK_CONTAINS = /\bgoogle maps\b|\binstagram\b|\bfacebook\b|\bwhatsapp\b|€\s*only|notaflof|\bparty tip\b|\bfew spots\b|\bspots left\b|\bra tickets\b|\btickets here\b|\bsell tickets\b|\bbook your spot\b|\bbook now\b|\bclick here\b|\blink in bio\b|\bswipe up\b|\bhttps?:\/\//i;
     if (JUNK_CONTAINS.test(t)) return false;
 
     // Title is just a weekday or relative date reference
-    if (/^(today|tomorrow|morgen|heute|übermorgen|this week)\b/i.test(t)) return false;
+    if (/^(today|tomorrow|morgen|heute|übermorgen|next week|this week|this evening|heute abend)\b/i.test(t)) return false;
 
     // Titles shorter than 2 words that are all lowercase → likely a fragment
     const words = t.split(/\s+/);
@@ -620,7 +650,7 @@ export class TelegramGroupAdapter implements WebsiteAdapter {
         const lines = clean.split('\n').map(l => l.trim()).filter(l => l.length > 0);
 
         // Lines that are definitely NOT the event title
-        const PROMO_RE   = /^\d+\s*(?:€|euro|eur)\b/i;        // "15 Euro", "€10"
+        const PROMO_RE   = /^\d+\s*(?:€|euro|eur)|^€/i;       // "15 Euro", "€10", "€ only", "45€ (NOTAFLOF)"
         const DATE_RE    = /^\d{1,2}[.:]\d{1,2}/;              // "24.05" or "20:00"
         const EMOJI_RE   = /^[\p{Emoji}\s]+$/u;                // line is only emojis
         const FIRST_PERSON_RE = /^(i |ich |i'm |I'm )/i;      // personal lines
