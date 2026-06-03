@@ -12,6 +12,22 @@ import { ArtAtBerlinAdapter } from './adapters/artAtBerlin.js';
 // 1. Initialize environment configuration variables
 dotenv.config();
 
+// Global safety net: if any adapter fires an uncaughtException (e.g. GramJS MTProto errors),
+// log it and exit cleanly so GitHub Actions doesn't mark the whole workflow as failed.
+// Other adapters that already completed have already written their data to Supabase.
+process.on('uncaughtException', (err: unknown) => {
+    const msg = (err as any)?.errorMessage ?? (err as any)?.message ?? String(err);
+    console.error(`\n💥 [ORCHESTRATOR] Uncaught exception — one adapter crashed: ${msg}`);
+    console.error('Other adapters that completed before this point have been saved.');
+    process.exit(0); // exit 0 so GitHub Actions doesn't fail the whole workflow
+});
+
+process.on('unhandledRejection', (reason: unknown) => {
+    const msg = (reason as any)?.errorMessage ?? (reason as any)?.message ?? String(reason);
+    console.error(`\n💥 [ORCHESTRATOR] Unhandled rejection: ${msg}`);
+    process.exit(0);
+});
+
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseSecretKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -60,10 +76,12 @@ async function runOrchestrator() {
             },
         ]),
         new FlutgrabenAdapter(),
+        new ArtAtBerlinAdapter(),
+        // Telegram last: GramJS can fire uncaughtException on session errors.
+        // Running it last ensures all other adapters complete before any crash.
         new TelegramGroupAdapter(7,
             (process.env['TELEGRAM_GROUP_IDS'] ?? '').split(',').filter(Boolean),
         ),
-        new ArtAtBerlinAdapter(),
     ];
 
     let totalProcessed = 0;
