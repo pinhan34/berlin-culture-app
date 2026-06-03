@@ -84,7 +84,7 @@ const BLOCKED_URL_PATTERNS = [
 const BLOCKED_DOMAINS = ['instagram.com', 'www.instagram.com', 'facebook.com', 'www.facebook.com', 'fb.me', 'maps.google.com', 'goo.gl', 'maps.app.goo.gl', 'google.com'];
 const RELIABLE_DOMAINS = ['ra.co', 'www.ra.co', 'eventbrite.com', 'www.eventbrite.com', 'eventbrite.de', 'eventbrite.co.uk', 'dice.fm', 'www.dice.fm', 'tickets.de', 'koka36.de', 'schwuz.de'];
 
-/** Decode common HTML entities so stored titles don't contain &quot; or &#x1f4ab; */
+/** Decode HTML entities so stored titles don't contain &amp; or &#8211; or &quot; */
 function decodeHtmlEntities(s: string): string {
     return s
         .replace(/&amp;/g, '&')
@@ -92,16 +92,88 @@ function decodeHtmlEntities(s: string): string {
         .replace(/&#039;/g, "'")
         .replace(/&lt;/g, '<')
         .replace(/&gt;/g, '>')
-        .replace(/&#x[0-9a-f]+;/gi, '') // remove remaining hex entities (emoji etc.)
-        .replace(/&#\d+;/g, '')          // remove remaining decimal entities
+        // Numeric entities: &#8211; → –,  &#38; → &, etc.
+        .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)))
+        // Hex entities: &#x2013; → –, but remove rare extended Unicode / emoji codepoints
+        .replace(/&#x([0-9a-f]+);/gi, (_, hex) => {
+            const cp = parseInt(hex, 16);
+            return cp < 0x10000 ? String.fromCharCode(cp) : '';
+        })
         .trim();
 }
 
 /**
+ * Strip common ticketing/site-name suffixes from page titles and return null
+ * if what remains is a generic section title (e.g. "Events", "Aktuelles").
+ */
+function stripPageSuffix(raw: string): string | null {
+    const stripped = raw
+        .replace(/\s*[|\u2013\u2014]\s*(Resident Advisor|RA|Eventbrite|Facebook|Instagram|Alle Events[^|]*|Events, Termine[^|]*|Tickets kaufen[^|]*|Ticketmaster[^|]*).*$/i, '')
+        .replace(/\s*[|\u2013\u2014]\s*.{0,40}(ticket|karten|billett|billet|event|veranstaltung).*$/i, '')
+        .trim();
+    // Discard generic page/section titles that are not specific event names
+    if (/^(events?|aktuelles|news|workshops?|termine|programm|veranstaltungen|home|start|shop|start page)\b/i.test(stripped)) return null;
+    if (stripped.length < 4) return null;
+    return stripped;
+}
+
+const RA_GRAPHQL_URL = 'https://ra.co/graphql';
+const RA_EVENT_RE = /ra\.co\/events\/(\d+)/i;
+
+const RA_EVENT_QUERY = `
+  query GET_EVENT($id: ID!) {
+    event(id: $id) {
+      title
+      venue { name }
+      date
+      startTime
+    }
+  }
+`;
+
+/**
+ * Fetch a single RA event by its ID using RA's own GraphQL API.
+ * This bypasses the HTTP 403 that RA returns for direct HTML scraping.
+ */
+async function fetchRAEventMeta(eventId: string): Promise<{ title?: string; venue?: string }> {
+    try {
+        const resp = await fetch(RA_GRAPHQL_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Referer': `https://ra.co/events/${eventId}`,
+                'Origin': 'https://ra.co',
+            },
+            body: JSON.stringify({
+                operationName: 'GET_EVENT',
+                query: RA_EVENT_QUERY,
+                variables: { id: eventId },
+            }),
+            signal: AbortSignal.timeout(8000),
+        });
+        if (!resp.ok) return {};
+        const json = await resp.json();
+        const event = json.data?.event;
+        if (!event?.title) return {};
+        return { title: event.title.trim(), venue: event.venue?.name?.trim() };
+    } catch {
+        return {};
+    }
+}
+
+/**
  * Fetch page metadata (title + venue) from an event URL.
+ * For ra.co/events/... URLs, uses RA's GraphQL API (avoids the 403).
  * Returns { title, venue } on success, or {} if blocked/failed.
  */
 async function fetchEventMeta(url: string): Promise<{ title?: string; venue?: string }> {
+    // RA blocks direct HTML fetches with 403 — use their own GraphQL API instead
+    const raMatch = url.match(RA_EVENT_RE);
+    if (raMatch?.[1]) {
+        return fetchRAEventMeta(raMatch[1]);
+    }
+
     try {
         const hostname = new URL(url).hostname.replace(/^www\./, '');
         if (BLOCKED_DOMAINS.some(d => d.includes(hostname) || url.includes(d))) {
@@ -114,8 +186,12 @@ async function fetchEventMeta(url: string): Promise<{ title?: string; venue?: st
         const res = await fetch(url, {
             signal: controller.signal,
             headers: {
-                'User-Agent': 'Mozilla/5.0 (compatible; BerlinCultureBot/1.0)',
-                'Accept': 'text/html',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.9,de;q=0.8',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1',
             },
         });
         clearTimeout(timeout);
@@ -144,19 +220,15 @@ async function fetchEventMeta(url: string): Promise<{ title?: string; venue?: st
         const og = html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i)
                 ?? html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:title["']/i);
         if (og?.[1]) {
-            const title = decodeHtmlEntities(og[1])
-                .replace(/\s*[|\u2013\u2014-]\s*(Resident Advisor|RA|Eventbrite|Facebook|Instagram).*$/i, '')
-                .trim();
-            return { title };
+            const title = stripPageSuffix(decodeHtmlEntities(og[1]));
+            if (title) return { title };
         }
 
         // 3. HTML <title> as last resort
         const htmlTitle = html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1];
         if (htmlTitle) {
-            const title = decodeHtmlEntities(htmlTitle)
-                .replace(/\s*[|\u2013\u2014-]\s*(Resident Advisor|RA|Eventbrite|Facebook|Instagram).*$/i, '')
-                .trim();
-            return { title };
+            const title = stripPageSuffix(decodeHtmlEntities(htmlTitle));
+            if (title) return { title };
         }
     } catch { /* network error, timeout, redirect loop — fall back silently */ }
     return {};
@@ -186,7 +258,7 @@ function isTitleClean(title: string): boolean {
     if (/^(january|february|march|april|may|june|july|august|september|october|november|december|januar|februar|märz|mai|juni|juli|oktober|dezember|monday|tuesday|wednesday|thursday|friday|saturday|sunday|montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonntag)\b.{0,8}(\d|uhr|pm|am)/i.test(t)) return false;
 
     // Conversational / personal openers that are never event titles
-    const JUNK_START = /^(hi\b|hey\b|hallo\b|hello\b|dear\b|come\b|join\b|book\b|bring\b|few\b|get\b|grab\b|save\b|buy\b|register\b|sign\b|liebe|lieber|i have\b|i got\b|i['']m\b|i am\b|there are\b|would\b|could\b|looking\b|selling\b|give\b|suche\b|verschenke\b|ich\b|wer\b|does\b|anyone\b|google\b|instagram\b|facebook\b|euros\b|das erwartet|hier (ist|sind|findet|gibt)|this (monday|tuesday|wednesday|thursday|friday|saturday|sunday|evening|weekend)\b)/i;
+    const JUNK_START = /^(hi\b|hey\b|hallo\b|hello\b|dear|come\b|join\b|book\b|bring\b|few\b|get\b|grab\b|save\b|buy\b|register\b|sign\b|hosted by\b|last chance\b|liebe|lieber|i have\b|i got\b|i['']m\b|i am\b|there are\b|would\b|could\b|looking\b|selling\b|give\b|suche\b|verschenke\b|ich\b|wer\b|does\b|anyone\b|news\b|aktuelles\b|workshops?\b|termine\b|programm\b|google\b|instagram\b|facebook\b|euros\b|das erwartet|hier (ist|sind|findet|gibt)|this (monday|tuesday|wednesday|thursday|friday|saturday|sunday|evening|weekend)\b)/i;
     if (JUNK_START.test(t)) return false;
 
     // Arrow / dash openers — lineup entries, not event names
@@ -194,7 +266,7 @@ function isTitleClean(title: string): boolean {
 
     // Phrases that can appear anywhere in the title
     // Note: avoid \b before non-word chars like €
-    const JUNK_CONTAINS = /\bgoogle maps\b|\binstagram\b|\bfacebook\b|\bwhatsapp\b|€\s*only|notaflof|\bparty tip\b|\bfew spots\b|\bspots left\b|\bra tickets\b|\btickets here\b|\bsell tickets\b|\bbook your spot\b|\bbook now\b|\bclick here\b|\blink in bio\b|\bswipe up\b|\bhttps?:\/\//i;
+    const JUNK_CONTAINS = /\bgoogle maps\b|\binstagram\b|\bfacebook\b|\bwhatsapp\b|€\s*only|notaflof|\bparty tip\b|\bfew spots\b|\bspots left\b|\bra tickets\b|\bticket link\b|\btickets here\b|\bsell tickets\b|\bdj lineup\b|\bbook your spot\b|\bbook now\b|\bclick here\b|\blink in bio\b|\bswipe up\b|\blast chance\b|\bhttps?:\/\//i;
     if (JUNK_CONTAINS.test(t)) return false;
 
     // Title is just a weekday or relative date reference
