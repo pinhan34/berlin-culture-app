@@ -3,7 +3,7 @@ import { EventFeed } from '@/components/EventFeed';
 import { VenueStrip } from '@/components/VenueStrip';
 import type { Event, Venue } from '@/lib/types';
 
-export const revalidate = 300; // ISR: refresh data every 5 minutes
+export const revalidate = 60; // ISR: refresh data every 60 seconds
 
 async function getData(): Promise<{ events: Event[]; venues: Venue[] }> {
   const supabase = createClient(

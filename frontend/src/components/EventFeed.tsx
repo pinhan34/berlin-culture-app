@@ -76,22 +76,14 @@ const VENUE_DISPLAY_CAP = 30;
 /** Telegram venue id — events without a real external URL are excluded. */
 const TELEGRAM_VENUE_ID = 7;
 
-/** Titles that are clearly promotional noise rather than event names. */
-const PROMO_TITLE_RE = /^\d+\s*(?:€|euro|eur)\b/i;
-
-/**
- * Conversational / personal-message openers — titles starting with these
- * are group chat messages, not events (e.g. "Hey Lovelies, i have a ticket…")
- */
-const PERSONAL_TITLE_RE = /^(hey\b|hi\b|hallo\b|hello\b|i have\b|i'm\b|i am\b|ich habe\b|ich bin\b|ich suche\b|selling\b|give away\b|giving away\b|does anyone\b|anyone\b|wer hat\b|wer kennt\b|suche\b|verschenke\b|leider\b)/i;
+/** Sinema Transtopia gets a lower cap so it doesn't crowd out Art at Berlin in the Art category. */
+const VENUE_CAP_OVERRIDES: Record<number, number> = {
+  1: 15, // Sinema Transtopia — many screenings, keep balanced with gallery events
+};
 
 function isQualityEvent(e: Event): boolean {
-  // Block old t.me fallback URLs already in the DB (new scraper stores null instead)
+  // Block stale t.me fallback URLs left in the DB from before the enrichment fix
   if (e.event_url?.startsWith('https://t.me/')) return false;
-  // Drop events with obviously promotional titles (e.g. "15 € UNTIL MONDAY ONLY")
-  if (PROMO_TITLE_RE.test(e.title)) return false;
-  // Drop personal/conversational messages that slipped into the DB
-  if (PERSONAL_TITLE_RE.test(e.title)) return false;
   return true;
 }
 
@@ -111,14 +103,20 @@ export function EventFeed({ events, venues }: Props) {
 
   const cutoff = useMemo(() => getDateCutoff(dateRange), [dateRange]);
 
-  // Quality filter + venue cap — applied before any user filtering.
-  // Removes promo-only Telegram events and caps each venue to VENUE_DISPLAY_CAP.
+  // Quality filter + per-venue cap + URL-level dedup — applied before any user filtering.
   const cappedEvents = useMemo(() => {
     const countByVenue = new Map<number, number>();
+    const seenUrls = new Set<string>();
     return events.filter(e => {
       if (!isQualityEvent(e)) return false;
+      // Deduplicate by event_url: same URL from multiple scraper runs = same event
+      if (e.event_url) {
+        if (seenUrls.has(e.event_url)) return false;
+        seenUrls.add(e.event_url);
+      }
+      const cap = VENUE_CAP_OVERRIDES[e.venue_id] ?? VENUE_DISPLAY_CAP;
       const n = countByVenue.get(e.venue_id) ?? 0;
-      if (n >= VENUE_DISPLAY_CAP) return false;
+      if (n >= cap) return false;
       countByVenue.set(e.venue_id, n + 1);
       return true;
     });
