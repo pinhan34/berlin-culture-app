@@ -128,6 +128,25 @@ async function fetchEventMeta(url: string): Promise<{ title?: string; venue?: st
 }
 
 /**
+ * Returns true if a title looks like a real event name.
+ * Rejects conversational openers, personal messages, and common junk patterns.
+ * This is the last line of defence before writing to the database.
+ */
+function isTitleClean(title: string): boolean {
+    const t = title.trim();
+    if (t.length < 5) return false;
+    // Conversational / personal openers that are never event titles
+    const JUNK_START = /^(hi\b|hey\b|hallo\b|hello\b|dear\b|come\b|join\b|liebe|lieber|i have\b|i got\b|i['']m\b|i am\b|would\b|could\b|looking\b|selling\b|give\b|suche\b|verschenke\b|ich\b|wer\b|does\b|anyone\b|google\b|instagram\b|this (monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b)/i;
+    if (JUNK_START.test(t)) return false;
+    // Title is just a weekday or relative date reference
+    if (/^(today|tomorrow|morgen|heute|übermorgen|this week)\b/i.test(t)) return false;
+    // Titles shorter than 3 words that are all lowercase → likely a fragment
+    const words = t.split(/\s+/);
+    if (words.length < 2 && t === t.toLowerCase()) return false;
+    return true;
+}
+
+/**
  * GramJS throws non-standard null-prototype objects as errors.
  * This extracts a human-readable message from them.
  */
@@ -305,24 +324,39 @@ export class TelegramGroupAdapter implements WebsiteAdapter {
 
         console.log(`[${this.sourceName}] Found ${results.length} raw events in "${groupName}". Enriching from URLs...`);
 
-        // Enrich events that have external URLs: fetch page metadata to get the
-        // real event title and venue name instead of the Telegram message text.
-        const enriched = await Promise.all(
-            results.map(async e => {
-                if (!e.event_url) return e;
-                const meta = await fetchEventMeta(e.event_url);
-                return {
-                    ...e,
-                    title: meta.title ?? e.title,
-                    // Append venue if we found one and it's not already in the title
-                    ...(meta.venue && !e.title.toLowerCase().includes(meta.venue.toLowerCase())
-                        ? { title: `${meta.title ?? e.title} @ ${meta.venue}` }
-                        : {}),
-                };
+        // For each event:
+        //  • Has URL + enrichment succeeds → use real title from event page ("Event @ Venue")
+        //  • Has URL + enrichment fails (Instagram, etc.) → only keep if title looks clean
+        //  • No URL → only keep if title looks clean
+        const enriched = (await Promise.all(
+            results.map(async (e): Promise<NormalizedEvent | null> => {
+                if (e.event_url) {
+                    const meta = await fetchEventMeta(e.event_url);
+                    if (meta.title) {
+                        // Enrichment succeeded — use the real event page title
+                        const title = meta.venue
+                            ? `${meta.title} @ ${meta.venue}`
+                            : meta.title;
+                        return { ...e, title };
+                    }
+                    // Enrichment failed (Instagram, blocked site, etc.)
+                    // Only keep if the Telegram text title is actually clean
+                    if (!isTitleClean(e.title)) {
+                        console.log(`[${this.sourceName}] Dropped (enrichment failed, bad title): "${e.title}"`);
+                        return null;
+                    }
+                    return e;
+                }
+                // No URL — only keep if title is clean
+                if (!isTitleClean(e.title)) {
+                    console.log(`[${this.sourceName}] Dropped (no URL, bad title): "${e.title}"`);
+                    return null;
+                }
+                return e;
             })
-        );
+        )).filter((e): e is NormalizedEvent => e !== null);
 
-        console.log(`[${this.sourceName}] Enrichment done. Returning ${enriched.length} events.`);
+        console.log(`[${this.sourceName}] After quality gate: ${enriched.length} / ${results.length} events kept.`);
         return enriched;
     }
 
