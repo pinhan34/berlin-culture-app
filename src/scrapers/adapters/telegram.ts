@@ -235,6 +235,49 @@ async function fetchEventMeta(url: string): Promise<{ title?: string; venue?: st
 }
 
 /**
+ * Try to extract a venue name from raw Telegram message text.
+ * Used when there is no external URL to enrich from.
+ *
+ * Matches common patterns found in Berlin event posts:
+ *   "SEXY LINE UP … Messy Salon #1–Café Cralle"   → "Café Cralle"
+ *   "Party @ Tresor"                                → "Tresor"
+ *   "Workshop im silent green"                      → "silent green"
+ *   "Konzert in der Volksbühne"                     → "Volksbühne"
+ */
+function extractVenueFromText(text: string): string | null {
+    // 1. Explicit "@" separator: "... @ Venue Name"
+    const atMatch = text.match(/[@＠]\s*([A-ZÄÖÜ][^\n@#]{2,50}?)(?:\s*[,|)\n]|$)/m);
+    if (atMatch?.[1]) {
+        const v = atMatch[1].trim();
+        if (v.length >= 3 && !URL_RE.test(v)) return v;
+    }
+
+    // 2. En/em dash on a line: "Series #1–Café Cralle" or "Title — Venue"
+    const dashMatch = text.match(/[–—]\s*([A-ZÄÖÜ][^\n–—,]{2,50}?)(?:\s*[,|\n]|$)/m);
+    if (dashMatch?.[1]) {
+        const v = dashMatch[1].trim();
+        if (v.length >= 3 && !URL_RE.test(v)) return v;
+    }
+
+    // 3a. German prepositions — allow lowercase starts (e.g. "im silent green")
+    const prepDe = text.match(
+        /\b(?:im|in der|in dem|an der|an dem|bei)\s+([A-ZÄÖÜa-zäöü][^\n,.!?]{3,50}?)(?:\s*[,\n.!?]|$)/m,
+    );
+    if (prepDe?.[1]) {
+        const v = prepDe[1].trim();
+        if (v.length >= 3 && !/^\d/.test(v) && !URL_RE.test(v)) return v;
+    }
+    // 3b. English "at" — require uppercase start to avoid "at the door", "at midnight" etc.
+    const prepEn = text.match(/\bat\s+([A-ZÄÖÜ][^\n,.!?]{3,50}?)(?:\s*[,\n.!?]|$)/m);
+    if (prepEn?.[1]) {
+        const v = prepEn[1].trim();
+        if (v.length >= 3 && !URL_RE.test(v)) return v;
+    }
+
+    return null;
+}
+
+/**
  * Returns true if a title looks like a real event name.
  * Rejects conversational openers, personal messages, and common junk patterns.
  * This is the last line of defence before writing to the database.
@@ -474,6 +517,13 @@ export class TelegramGroupAdapter implements WebsiteAdapter {
                                 : meta.title;
                         }
                     }
+                } else {
+                    // No URL at all: only keep if we have "Title @ Venue" — otherwise
+                    // the event card would show a floating title with no context.
+                    if (!finalTitle.includes(' @ ')) {
+                        console.log(`[${this.sourceName}] Dropped (no URL, no venue): "${finalTitle}"`);
+                        return null;
+                    }
                 }
 
                 // FINAL GATE: applies to ALL events regardless of source.
@@ -532,9 +582,19 @@ export class TelegramGroupAdapter implements WebsiteAdapter {
                 ? externalUrl
                 : null;
 
+        // For link-less events, try to extract the venue name from the text now,
+        // so we can format "Title @ Venue" and have meaningful content to show.
+        let finalTitle = title;
+        if (!eventUrl) {
+            const venue = extractVenueFromText(text);
+            if (venue) {
+                finalTitle = `${title} @ ${venue}`;
+            }
+        }
+
         return {
             venue_id: this.venueId,
-            title,
+            title: finalTitle,
             start_time: startTime,
             duration: null,
             event_url: eventUrl,
