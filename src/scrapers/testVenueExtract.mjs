@@ -80,3 +80,43 @@ for (const { label, text, expectedVenue } of cases) {
     if (ok) passed++;
 }
 console.log(`\n${passed}/${cases.length} passed`);
+
+// --- finalTitle build logic (mirrors extractEvent for link-less events) ---
+function buildFinalTitle(title, text) {
+    const venue = extractVenueFromText(text);
+    if (!venue) return null; // dropped
+    if (!title.toLowerCase().includes(venue.toLowerCase())) return `${title} @ ${venue}`;
+    return title; // venue already in title — no redundant append
+}
+
+console.log('\n--- finalTitle build ---');
+const titleCases = [
+    {
+        label: "Venue already in title — no redundant append",
+        title: 'Messy Salon #1–Café Cralle',
+        text: 'Seminar 14.6.\nMessy Salon #1–Café Cralle',
+        expected: 'Messy Salon #1–Café Cralle',
+    },
+    {
+        label: "Venue separate — appended",
+        title: 'CONTROL FREAK',
+        text: 'CONTROL FREAK @ Tresor\n7.6. workshop',
+        expected: 'CONTROL FREAK @ Tresor',
+    },
+    {
+        label: "No venue — dropped",
+        title: 'Some party',
+        text: 'Some party next friday 20.6. come dance',
+        expected: null,
+    },
+];
+let tPassed = 0;
+for (const { label, title, text, expected } of titleCases) {
+    const got = buildFinalTitle(title, text);
+    const ok = got === expected;
+    console.log(`${ok ? '✓' : '✗'} ${label}`);
+    if (!ok) console.log(`    expected: ${JSON.stringify(expected)}, got: ${JSON.stringify(got)}`);
+    else console.log(`    => ${got === null ? '(dropped)' : `"${got}"`}`);
+    if (ok) tPassed++;
+}
+console.log(`\n${tPassed}/${titleCases.length} passed`);

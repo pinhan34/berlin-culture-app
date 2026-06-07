@@ -507,6 +507,8 @@ export class TelegramGroupAdapter implements WebsiteAdapter {
             results.map(async (e): Promise<NormalizedEvent | null> => {
                 let finalTitle = e.title;
 
+                // Link-less events without a detectable venue were already dropped
+                // in extractEvent, so anything here with no URL already has a venue.
                 if (e.event_url) {
                     const isBlockedUrl = BLOCKED_URL_PATTERNS.some(p => e.event_url!.includes(p));
                     if (!isBlockedUrl) {
@@ -516,13 +518,6 @@ export class TelegramGroupAdapter implements WebsiteAdapter {
                                 ? `${meta.title} @ ${meta.venue}`
                                 : meta.title;
                         }
-                    }
-                } else {
-                    // No URL at all: only keep if we have "Title @ Venue" — otherwise
-                    // the event card would show a floating title with no context.
-                    if (!finalTitle.includes(' @ ')) {
-                        console.log(`[${this.sourceName}] Dropped (no URL, no venue): "${finalTitle}"`);
-                        return null;
                     }
                 }
 
@@ -582,12 +577,16 @@ export class TelegramGroupAdapter implements WebsiteAdapter {
                 ? externalUrl
                 : null;
 
-        // For link-less events, try to extract the venue name from the text now,
-        // so we can format "Title @ Venue" and have meaningful content to show.
+        // For link-less events we need a venue to give the card context.
+        // If we can't find one in the text, drop the event entirely.
         let finalTitle = title;
         if (!eventUrl) {
             const venue = extractVenueFromText(text);
-            if (venue) {
+            if (!venue) return null; // no link and no detectable venue → not enough context
+            // Only append the venue if the title doesn't already contain it
+            // (titles are often "Series #1–Café Cralle", where the venue is
+            // already part of the name — appending would read redundantly).
+            if (!title.toLowerCase().includes(venue.toLowerCase())) {
                 finalTitle = `${title} @ ${venue}`;
             }
         }
