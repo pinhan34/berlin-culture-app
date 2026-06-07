@@ -4,12 +4,15 @@ import { useState, useMemo, useEffect } from 'react';
 import type { Event, Venue } from '@/lib/types';
 import { getVenueCategory, type VenueCategory } from '@/lib/venueCategories';
 import { useLocalStorage } from '@/lib/useLocalStorage';
+import { getInteractions, type Interaction } from '@/lib/interactions';
+import { buildTasteProfile, scoreEvent } from '@/lib/recommendations';
 import { EventCard } from './EventCard';
 import { VenueFilter } from './VenueFilter';
 import { DateFilter } from './DateFilter';
 import { QuickPicks } from './QuickPicks';
 import { SurpriseMe } from './SurpriseMe';
 import { JustAdded } from './JustAdded';
+import { ForYou } from './ForYou';
 import { MoodTiles } from './MoodTiles';
 
 interface Props {
@@ -26,6 +29,11 @@ const JUST_ADDED_LIMIT = 6;
  * DB wipe + re-scrape), the freshness UI is noise — suppress it.
  */
 const FRESH_NOISE_THRESHOLD = 0.4;
+
+/** Minimum taste signals (clicks/saves/favourites) before personalization kicks in. */
+const TASTE_THRESHOLD = 3;
+/** Max cards shown in the "For you" row. */
+const FOR_YOU_LIMIT = 6;
 
 function timeAgo(ms: number): string {
   const diffMin = Math.floor((Date.now() - ms) / 60_000);
@@ -162,9 +170,20 @@ export function EventFeed({ events, venues }: Props) {
     return { newIds: ids, lastUpdated: maxCreated, isFreshData: fresh };
   }, [cappedEvents]);
 
-  // Avoid hydration mismatch for the relative "updated X ago" label.
+  // Avoid hydration mismatch: load client-only signals (timestamps, taste) after mount.
   const [mounted, setMounted] = useState(false);
-  useEffect(() => { setMounted(true); }, []);
+  const [interactions, setInteractions] = useState<Interaction[]>([]);
+  useEffect(() => {
+    setMounted(true);
+    setInteractions(getInteractions());
+  }, []);
+
+  // Taste profile from local signals (clicks, calendar saves, favourites).
+  const profile = useMemo(
+    () => buildTasteProfile(cappedEvents, interactions, favouriteIds),
+    [cappedEvents, interactions, favouriteIds],
+  );
+  const hasTaste = mounted && profile.totalSignals >= TASTE_THRESHOLD;
 
   // Fix 1 — category counts for mood tile badges (based on capped, date-bounded set)
   const categoryCounts = useMemo(() => {
@@ -189,6 +208,8 @@ export function EventFeed({ events, venues }: Props) {
     });
   }, [cappedEvents, selectedVenues, moodCategory, cutoff, showFavourites, favouriteSet]);
 
+  const isDefaultView = !moodCategory && selectedVenues.size === 0 && !showFavourites;
+
   // "Just added" strip — most recently scraped events (by created_at), surfaced
   // at the top so new content isn't buried in the chronological list.
   const justAdded = useMemo(() => {
@@ -199,18 +220,38 @@ export function EventFeed({ events, venues }: Props) {
       .slice(0, JUST_ADDED_LIMIT);
   }, [filtered, newIds, isFreshData]);
 
-  // Fix 3 — interleave by category in the default view so no source dominates a day.
-  // When a specific mood/venue/favourites filter is active, keep plain chronological order.
+  // "For you" row — top events ranked by the local taste profile. Only in the
+  // default view, and only once there's enough signal to be meaningful.
+  const forYou = useMemo(() => {
+    if (!hasTaste || !isDefaultView) return [];
+    return filtered
+      .map(e => ({ e, score: scoreEvent(e, profile) }))
+      .filter(x => x.score > 0)
+      .sort((a, b) =>
+        b.score - a.score ||
+        new Date(a.e.start_time).getTime() - new Date(b.e.start_time).getTime())
+      .slice(0, FOR_YOU_LIMIT)
+      .map(x => x.e);
+  }, [filtered, profile, hasTaste, isDefaultView]);
+
+  // Default view: personalize within-day ordering once we know the user's taste;
+  // otherwise interleave by category so no single source dominates a day.
+  // A specific mood/venue/favourites filter keeps plain chronological order.
   const grouped = useMemo(() => {
     const groups = groupByDate(filtered);
-    const isDefaultView = !moodCategory && selectedVenues.size === 0 && !showFavourites;
     if (isDefaultView) {
       for (const [date, dayEvents] of groups) {
-        groups.set(date, interleaveByCategory(dayEvents));
+        if (hasTaste) {
+          groups.set(date, [...dayEvents].sort((a, b) =>
+            scoreEvent(b, profile) - scoreEvent(a, profile) ||
+            new Date(a.start_time).getTime() - new Date(b.start_time).getTime()));
+        } else {
+          groups.set(date, interleaveByCategory(dayEvents));
+        }
       }
     }
     return groups;
-  }, [filtered, moodCategory, selectedVenues, showFavourites]);
+  }, [filtered, isDefaultView, hasTaste, profile]);
 
   function toggleVenue(id: number) {
     setVenueArray(prev => prev.includes(id) ? prev.filter(v => v !== id) : [...prev, id]);
@@ -263,6 +304,13 @@ export function EventFeed({ events, venues }: Props) {
           </button>
         </div>
       )}
+
+      {/* For you */}
+      <ForYou
+        events={forYou}
+        isFavourited={(id) => favouriteSet.has(id)}
+        onFavouriteToggle={handleFavouriteToggle}
+      />
 
       {/* Just added */}
       <JustAdded events={justAdded} />
