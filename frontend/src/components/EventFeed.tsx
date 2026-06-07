@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import type { Event, Venue } from '@/lib/types';
 import { getVenueCategory, type VenueCategory } from '@/lib/venueCategories';
 import { useLocalStorage } from '@/lib/useLocalStorage';
@@ -9,11 +9,32 @@ import { VenueFilter } from './VenueFilter';
 import { DateFilter } from './DateFilter';
 import { QuickPicks } from './QuickPicks';
 import { SurpriseMe } from './SurpriseMe';
+import { JustAdded } from './JustAdded';
 import { MoodTiles } from './MoodTiles';
 
 interface Props {
   events: Event[];
   venues: Venue[];
+}
+
+/** Events scraped within this window are considered "new". */
+const NEW_WINDOW_HOURS = 48;
+/** Max cards shown in the "Just added" strip. */
+const JUST_ADDED_LIMIT = 6;
+/**
+ * If more than this fraction of all events are "new" (e.g. right after a full
+ * DB wipe + re-scrape), the freshness UI is noise — suppress it.
+ */
+const FRESH_NOISE_THRESHOLD = 0.4;
+
+function timeAgo(ms: number): string {
+  const diffMin = Math.floor((Date.now() - ms) / 60_000);
+  if (diffMin < 1) return 'just now';
+  if (diffMin < 60) return `${diffMin} min${diffMin !== 1 ? 's' : ''} ago`;
+  const diffH = Math.floor(diffMin / 60);
+  if (diffH < 24) return `${diffH} hour${diffH !== 1 ? 's' : ''} ago`;
+  const diffD = Math.floor(diffH / 24);
+  return `${diffD} day${diffD !== 1 ? 's' : ''} ago`;
 }
 
 function getDateCutoff(range: string): Date {
@@ -122,6 +143,29 @@ export function EventFeed({ events, venues }: Props) {
     });
   }, [events]);
 
+  // Freshness — which events were scraped recently, and when the data was last refreshed.
+  const { newIds, lastUpdated, isFreshData } = useMemo(() => {
+    const now = Date.now();
+    const windowMs = NEW_WINDOW_HOURS * 3_600_000;
+    const ids = new Set<number>();
+    let maxCreated = 0;
+    for (const e of cappedEvents) {
+      const created = e.created_at ? new Date(e.created_at).getTime() : 0;
+      if (created > maxCreated) maxCreated = created;
+      if (created > 0 && now - created <= windowMs) ids.add(e.id);
+    }
+    // Suppress freshness UI when almost everything is "new" (e.g. after a wipe).
+    const fresh =
+      cappedEvents.length > 0 &&
+      ids.size > 0 &&
+      ids.size / cappedEvents.length < FRESH_NOISE_THRESHOLD;
+    return { newIds: ids, lastUpdated: maxCreated, isFreshData: fresh };
+  }, [cappedEvents]);
+
+  // Avoid hydration mismatch for the relative "updated X ago" label.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
   // Fix 1 — category counts for mood tile badges (based on capped, date-bounded set)
   const categoryCounts = useMemo(() => {
     const counts: Partial<Record<VenueCategory, number>> = {};
@@ -144,6 +188,16 @@ export function EventFeed({ events, venues }: Props) {
       return true;
     });
   }, [cappedEvents, selectedVenues, moodCategory, cutoff, showFavourites, favouriteSet]);
+
+  // "Just added" strip — most recently scraped events (by created_at), surfaced
+  // at the top so new content isn't buried in the chronological list.
+  const justAdded = useMemo(() => {
+    if (!isFreshData) return [];
+    return filtered
+      .filter(e => newIds.has(e.id))
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .slice(0, JUST_ADDED_LIMIT);
+  }, [filtered, newIds, isFreshData]);
 
   // Fix 3 — interleave by category in the default view so no source dominates a day.
   // When a specific mood/venue/favourites filter is active, keep plain chronological order.
@@ -181,6 +235,14 @@ export function EventFeed({ events, venues }: Props) {
 
   return (
     <div className="space-y-8">
+      {/* Last updated */}
+      {mounted && lastUpdated > 0 && (
+        <div className="flex items-center justify-end gap-1.5 text-xs text-stone-400 dark:text-stone-500">
+          <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400" />
+          Updated {timeAgo(lastUpdated)}
+        </div>
+      )}
+
       {/* Mood tiles */}
       <MoodTiles active={moodCategory} onSelect={handleMoodSelect} counts={categoryCounts} />
 
@@ -201,6 +263,9 @@ export function EventFeed({ events, venues }: Props) {
           </button>
         </div>
       )}
+
+      {/* Just added */}
+      <JustAdded events={justAdded} />
 
       {/* Quick picks */}
       <QuickPicks events={filtered} />
@@ -279,6 +344,7 @@ export function EventFeed({ events, venues }: Props) {
                   <div key={event.id} className={`animate-fade-up stagger-${Math.min(i + 1, 9)}`}>
                     <EventCard
                       event={event}
+                      isNew={isFreshData && newIds.has(event.id)}
                       isFavourited={favouriteSet.has(event.id)}
                       onFavouriteToggle={handleFavouriteToggle}
                     />

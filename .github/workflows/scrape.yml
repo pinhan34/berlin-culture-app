@@ -1,9 +1,9 @@
-name: Daily Event Scraper
+name: Event Scraper
 
 on:
   schedule:
-    # Runs at 06:00 UTC = 08:00 Berlin time (CEST) every day
-    - cron: '0 6 * * *'
+    # Every 6 hours (00:00, 06:00, 12:00, 18:00 UTC) so new events surface multiple times a day
+    - cron: '0 */6 * * *'
   workflow_dispatch: # Allows manual trigger from GitHub UI
 
 jobs:

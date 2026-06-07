@@ -55,11 +55,12 @@ export function getUrgencyLabel(startTime: string): string | null {
 interface Props {
   event: Event;
   highlight?: boolean;
+  isNew?: boolean;
   isFavourited?: boolean;
   onFavouriteToggle?: (id: number) => void;
 }
 
-export function EventCard({ event, highlight, isFavourited = false, onFavouriteToggle }: Props) {
+export function EventCard({ event, highlight, isNew = false, isFavourited = false, onFavouriteToggle }: Props) {
   const venueName = getVenueDisplayName(event.venue_id, event.venue?.name ?? `Venue #${event.venue_id}`);
   const category = getVenueCategory(event.venue_id);
   const style = CATEGORY_STYLES[category];
@@ -86,6 +87,11 @@ export function EventCard({ event, highlight, isFavourited = false, onFavouriteT
 
   const inner = (
     <>
+      {isNew && (
+        <span className="absolute -top-2.5 left-3 inline-flex items-center gap-1 rounded-full bg-fuchsia-600 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white shadow-sm dark:bg-fuchsia-500">
+          New
+        </span>
+      )}
       {urgency && (
         <span className="absolute -top-2.5 right-3 inline-block rounded-full bg-pink-500 px-2.5 py-0.5 text-[11px] font-bold text-white shadow-sm dark:bg-pink-400">
           {urgency}
