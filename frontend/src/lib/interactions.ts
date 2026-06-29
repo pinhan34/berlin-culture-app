@@ -28,12 +28,22 @@ export interface InteractionMeta {
   venueId?: number;
 }
 
-/** Extracts a clean hostname ("ra.co") from a URL, or null if it can't be parsed. */
+/**
+ * Maps alternate/short hostnames to a single canonical brand domain, so the
+ * traffic panel groups e.g. meetu.ps + meetup.com, or de.ra.co + ra.co together.
+ */
+const DOMAIN_ALIASES: Record<string, string> = {
+  'meetu.ps': 'meetup.com',
+  'de.ra.co': 'ra.co',
+  'eventbrite.de': 'eventbrite.com',
+};
+
+/** Extracts a clean, canonical hostname ("ra.co") from a URL, or null if unparseable. */
 export function extractDomain(url: string | null | undefined): string | null {
   if (!url) return null;
   try {
-    const host = new URL(url).hostname.toLowerCase();
-    return host.replace(/^www\./, '');
+    const host = new URL(url).hostname.toLowerCase().replace(/^www\./, '');
+    return DOMAIN_ALIASES[host] ?? host;
   } catch {
     return null;
   }

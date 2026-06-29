@@ -1,4 +1,5 @@
 import type { Event } from './types';
+import { getVenueCategory, type VenueCategory } from './venueCategories';
 
 /**
  * Content-based "vibe" tagging — a free, keyword-driven classifier that reads
@@ -7,11 +8,13 @@ import type { Event } from './types';
  * This is orthogonal to venue *category* (art/music/community/personal):
  * categories say WHERE an event is from, vibes say WHAT IT FEELS LIKE.
  * Runs entirely client-side, no API, no cost.
+ *
+ * Note: "queer" is intentionally NOT a vibe — it is a first-class Community
+ * lane (see communities.ts) to avoid a redundant duplicate filter.
  */
 export type Vibe =
   | 'party'
   | 'wellness'
-  | 'queer'
   | 'arts'
   | 'live'
   | 'community'
@@ -31,15 +34,6 @@ interface VibeDef {
 
 // Order matters: earlier entries are considered more salient and shown first.
 export const VIBE_DEFS: VibeDef[] = [
-  {
-    vibe: 'queer',
-    emoji: '\u{1F3F3}\u{FE0F}\u{200D}\u{1F308}',
-    label: 'Queer',
-    bg: 'bg-pink-50 dark:bg-pink-950/40',
-    text: 'text-pink-700 dark:text-pink-400',
-    border: 'border-pink-200 dark:border-pink-800',
-    pattern: /\b(queer|drag|flinta\*?|trans\*?|pride|gay|lesbian|dyke\*?|lgbtq?\+?|gbtq|sapphic|nonbinary|non-binary|enby)\b/i,
-  },
   {
     vibe: 'party',
     emoji: '\u{1F525}',
@@ -102,12 +96,29 @@ export function getVibeDef(vibe: Vibe): VibeDef {
   return VIBE_BY_KEY.get(vibe)!;
 }
 
-/** Classify an event into zero or more vibes, ordered by salience. */
+/**
+ * When no keyword matches, fall back to a vibe inferred from the venue's
+ * category so (almost) every event still carries one tag for discovery.
+ */
+const CATEGORY_FALLBACK: Record<VenueCategory, Vibe> = {
+  art: 'arts',
+  music: 'live',
+  community: 'community',
+  personal: 'community',
+};
+
+/**
+ * Classify an event into one or more vibes, ordered by salience.
+ * Always returns at least one vibe (keyword match, else a category fallback).
+ */
 export function getEventVibes(event: Event): Vibe[] {
   const haystack = `${event.title} ${event.venue?.name ?? ''}`;
   const result: Vibe[] = [];
   for (const def of VIBE_DEFS) {
     if (def.pattern.test(haystack)) result.push(def.vibe);
+  }
+  if (result.length === 0) {
+    result.push(CATEGORY_FALLBACK[getVenueCategory(event.venue_id)]);
   }
   return result;
 }

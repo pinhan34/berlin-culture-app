@@ -1,11 +1,10 @@
 import type { Event } from './types';
-import { getEventVibes } from './vibes';
 
 /**
  * Community lanes — the two communities this app is built to serve well.
  * These are first-class discovery entry points, not just filters.
  *
- *   queer         — reuses the content-based 'queer' vibe classification
+ *   queer          — content-based keyword classification on title/venue
  *   neurodivergent — keyword match on title/venue + the ND Community venue
  */
 export type Community = 'queer' | 'neurodivergent';
@@ -13,6 +12,7 @@ export type Community = 'queer' | 'neurodivergent';
 /** MeetUp "berlin-neurodivergent-community" venue. */
 const ND_VENUE_ID = 2;
 
+const QUEER_RE = /\b(queer|drag|flinta\*?|trans\*?|pride|gay|lesbian|dyke\*?|lgbtq?\+?|gbtq|sapphic|nonbinary|non-binary|enby)\b/i;
 const ND_RE = /\b(neurodivergent|neurodiverse|neurospicy|neuro-?spicy|autis\w*|adhd|au?dhd|asperger\w*|sensory-?friendly)\b/i;
 
 export interface CommunityDef {
@@ -60,9 +60,9 @@ export function getCommunityDef(community: Community): CommunityDef {
 /** Which communities an event belongs to (zero, one, or both). */
 export function getEventCommunities(event: Event): Community[] {
   const result: Community[] = [];
-  if (getEventVibes(event).includes('queer')) result.push('queer');
-
   const haystack = `${event.title} ${event.venue?.name ?? ''}`;
+
+  if (QUEER_RE.test(haystack)) result.push('queer');
   if (event.venue_id === ND_VENUE_ID || ND_RE.test(haystack)) {
     result.push('neurodivergent');
   }

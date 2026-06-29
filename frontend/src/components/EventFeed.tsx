@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import type { Event, Venue } from '@/lib/types';
-import { getVenueCategory, type VenueCategory } from '@/lib/venueCategories';
+import { getVenueDisplayName } from '@/lib/venueCategories';
 import { useLocalStorage } from '@/lib/useLocalStorage';
 import { getInteractions, type Interaction } from '@/lib/interactions';
 import { buildTasteProfile, scoreEvent } from '@/lib/recommendations';
-import { getEventVibes, type Vibe } from '@/lib/vibes';
-import { getEventCommunities, type Community } from '@/lib/communities';
+import { getEventVibes, VIBE_DEFS, getVibeDef, type Vibe } from '@/lib/vibes';
+import { getEventCommunities, getCommunityDef, type Community } from '@/lib/communities';
 import { EventCard } from './EventCard';
 import { VenueFilter } from './VenueFilter';
 import { DateFilter } from './DateFilter';
@@ -16,9 +16,9 @@ import { SurpriseMe } from './SurpriseMe';
 import { JustAdded } from './JustAdded';
 import { ForYou } from './ForYou';
 import { MoodTiles } from './MoodTiles';
-import { VibeBar } from './VibeBar';
 import { CommunityLanes } from './CommunityLanes';
 import { CalendarSubscribe } from './CalendarSubscribe';
+import { ActiveFilters, type ActiveFilterChip } from './ActiveFilters';
 
 interface Props {
   events: Event[];
@@ -34,6 +34,9 @@ const JUST_ADDED_LIMIT = 6;
  * DB wipe + re-scrape), the freshness UI is noise — suppress it.
  */
 const FRESH_NOISE_THRESHOLD = 0.4;
+
+/** Valid vibe keys — used to discard a persisted vibe that has since been retired. */
+const VALID_VIBES = new Set<Vibe>(VIBE_DEFS.map(d => d.vibe));
 
 /** Minimum taste signals (clicks/saves/favourites) before personalization kicks in. */
 const TASTE_THRESHOLD = 3;
@@ -83,17 +86,17 @@ function groupByDate(events: Event[]): Map<string, Event[]> {
 }
 
 /**
- * Fix 3 — round-robin through categories within a single day so no
- * single source (e.g. Telegram) dominates the top of any given day.
- * Art → Music → Community → Personal → Art → ...
+ * Round-robin across *venues* within a single day so no single high-volume
+ * source (Village Berlin, Telegram) dominates the top of the list.
  */
-function interleaveByCategory(dayEvents: Event[]): Event[] {
-  const buckets: Record<string, Event[]> = {};
+function interleaveByVenue(dayEvents: Event[]): Event[] {
+  const buckets = new Map<number, Event[]>();
   for (const e of dayEvents) {
-    const cat = getVenueCategory(e.venue_id);
-    (buckets[cat] ??= []).push(e);
+    const arr = buckets.get(e.venue_id) ?? [];
+    arr.push(e);
+    buckets.set(e.venue_id, arr);
   }
-  const queues = Object.values(buckets);
+  const queues = [...buckets.values()];
   const result: Event[] = [];
   while (queues.some(q => q.length > 0)) {
     for (const queue of queues) {
@@ -123,7 +126,6 @@ function isQualityEvent(e: Event): boolean {
 
 export function EventFeed({ events, venues }: Props) {
   // Persisted filter preferences — survive page reload
-  const [moodCategory, setMoodCategoryRaw] = useLocalStorage<VenueCategory | null>('bca_mood', null);
   const [venueArray, setVenueArray] = useLocalStorage<number[]>('bca_venues', []);
   const [dateRange, setDateRange] = useLocalStorage<string>('bca_date', 'all');
   const [favouriteIds, setFavouriteIds] = useLocalStorage<number[]>('bca_favourites', []);
@@ -133,6 +135,7 @@ export function EventFeed({ events, venues }: Props) {
   // Session-only UI state
   const [showFilters, setShowFilters] = useState(false);
   const [showFavourites, setShowFavourites] = useState(false);
+  const [showMore, setShowMore] = useState(false);
 
   const selectedVenues = useMemo(() => new Set(venueArray), [venueArray]);
   const favouriteSet = useMemo(() => new Set(favouriteIds), [favouriteIds]);
@@ -185,6 +188,13 @@ export function EventFeed({ events, venues }: Props) {
     setInteractions(getInteractions());
   }, []);
 
+  // Discard a persisted vibe that no longer exists (e.g. the retired "queer"
+  // vibe, now a Community lane) so it can't get stuck as an invisible filter.
+  useEffect(() => {
+    if (selectedVibe && !VALID_VIBES.has(selectedVibe)) setSelectedVibe(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedVibe]);
+
   // Taste profile from local signals (clicks, calendar saves, favourites).
   const profile = useMemo(
     () => buildTasteProfile(cappedEvents, interactions, favouriteIds),
@@ -206,56 +216,50 @@ export function EventFeed({ events, venues }: Props) {
     return map;
   }, [cappedEvents]);
 
-  // Fix 1 — category counts for mood tile badges (based on capped, date-bounded set)
-  const categoryCounts = useMemo(() => {
-    const counts: Partial<Record<VenueCategory, number>> = {};
-    for (const e of cappedEvents) {
-      if (new Date(e.start_time) > cutoff) continue;
-      const cat = getVenueCategory(e.venue_id);
-      counts[cat] = (counts[cat] ?? 0) + 1;
-    }
-    return counts;
-  }, [cappedEvents, cutoff]);
+  // Single source of truth for filtering. `skip` lets us compute each filter
+  // dimension's badge count as if that one dimension were not yet applied, so
+  // the counts always reflect the *combined* active filters (no misleading
+  // standalone numbers that resolve to zero results).
+  const passes = useCallback(
+    (
+      e: Event,
+      skip?: { vibe?: boolean; community?: boolean; venue?: boolean },
+    ): boolean => {
+      if (showFavourites) {
+        if (!favouriteSet.has(e.id)) return false;
+      } else if (!skip?.venue && selectedVenues.size > 0 && !selectedVenues.has(e.venue_id)) {
+        return false;
+      }
+      if (!skip?.vibe && selectedVibe && !(vibesByEvent.get(e.id) ?? []).includes(selectedVibe)) return false;
+      if (!skip?.community && selectedCommunity && !(communitiesByEvent.get(e.id) ?? []).includes(selectedCommunity)) return false;
+      if (new Date(e.start_time) > cutoff) return false;
+      return true;
+    },
+    [showFavourites, favouriteSet, selectedVenues, selectedVibe, vibesByEvent, selectedCommunity, communitiesByEvent, cutoff],
+  );
 
-  // Vibe counts for the vibe filter bar (capped, date-bounded set).
+  const filtered = useMemo(() => cappedEvents.filter(e => passes(e)), [cappedEvents, passes]);
+
+  // Combined-aware badge counts (each excludes only its own dimension).
   const vibeCounts = useMemo(() => {
     const counts: Partial<Record<Vibe, number>> = {};
     for (const e of cappedEvents) {
-      if (new Date(e.start_time) > cutoff) continue;
-      for (const v of vibesByEvent.get(e.id) ?? []) {
-        counts[v] = (counts[v] ?? 0) + 1;
-      }
+      if (!passes(e, { vibe: true })) continue;
+      for (const v of vibesByEvent.get(e.id) ?? []) counts[v] = (counts[v] ?? 0) + 1;
     }
     return counts;
-  }, [cappedEvents, cutoff, vibesByEvent]);
+  }, [cappedEvents, passes, vibesByEvent]);
 
-  // Community counts for the community lanes (capped, date-bounded set).
   const communityCounts = useMemo(() => {
     const counts: Partial<Record<Community, number>> = {};
     for (const e of cappedEvents) {
-      if (new Date(e.start_time) > cutoff) continue;
-      for (const c of communitiesByEvent.get(e.id) ?? []) {
-        counts[c] = (counts[c] ?? 0) + 1;
-      }
+      if (!passes(e, { community: true })) continue;
+      for (const c of communitiesByEvent.get(e.id) ?? []) counts[c] = (counts[c] ?? 0) + 1;
     }
     return counts;
-  }, [cappedEvents, cutoff, communitiesByEvent]);
+  }, [cappedEvents, passes, communitiesByEvent]);
 
-  const filtered = useMemo(() => {
-    return cappedEvents.filter(e => {
-      if (showFavourites && !favouriteSet.has(e.id)) return false;
-      if (!showFavourites) {
-        if (selectedVenues.size > 0 && !selectedVenues.has(e.venue_id)) return false;
-        if (moodCategory && getVenueCategory(e.venue_id) !== moodCategory) return false;
-      }
-      if (selectedVibe && !(vibesByEvent.get(e.id) ?? []).includes(selectedVibe)) return false;
-      if (selectedCommunity && !(communitiesByEvent.get(e.id) ?? []).includes(selectedCommunity)) return false;
-      if (new Date(e.start_time) > cutoff) return false;
-      return true;
-    });
-  }, [cappedEvents, selectedVenues, moodCategory, cutoff, showFavourites, favouriteSet, selectedVibe, vibesByEvent, selectedCommunity, communitiesByEvent]);
-
-  const isDefaultView = !moodCategory && selectedVenues.size === 0 && !showFavourites;
+  const isDefaultView = selectedVenues.size === 0 && !showFavourites;
 
   // "Just added" strip — most recently scraped events (by created_at), surfaced
   // at the top so new content isn't buried in the chronological list.
@@ -293,7 +297,7 @@ export function EventFeed({ events, venues }: Props) {
             scoreEvent(b, profile) - scoreEvent(a, profile) ||
             new Date(a.start_time).getTime() - new Date(b.start_time).getTime()));
         } else {
-          groups.set(date, interleaveByCategory(dayEvents));
+          groups.set(date, interleaveByVenue(dayEvents));
         }
       }
     }
@@ -304,12 +308,6 @@ export function EventFeed({ events, venues }: Props) {
     setVenueArray(prev => prev.includes(id) ? prev.filter(v => v !== id) : [...prev, id]);
   }
 
-  function handleMoodSelect(cat: VenueCategory | null) {
-    setMoodCategoryRaw(cat);
-    setVenueArray([]);
-    setShowFavourites(false);
-  }
-
   function handleFavouriteToggle(eventId: number) {
     setFavouriteIds(prev =>
       prev.includes(eventId) ? prev.filter(id => id !== eventId) : [...prev, eventId],
@@ -318,7 +316,50 @@ export function EventFeed({ events, venues }: Props) {
 
   function handleShowFavourites() {
     setShowFavourites(prev => !prev);
-    if (!showFavourites) setMoodCategoryRaw(null);
+  }
+
+  function clearAllFilters() {
+    setVenueArray([]);
+    setSelectedVibe(null);
+    setSelectedCommunity(null);
+    setDateRange('all');
+    setShowFavourites(false);
+  }
+
+  // Build the explicit "active filters" chips shown above the feed.
+  const venueNameById = useMemo(() => {
+    const m = new Map<number, string>();
+    for (const v of venues) m.set(v.id, getVenueDisplayName(v.id, v.name));
+    return m;
+  }, [venues]);
+
+  const activeChips: ActiveFilterChip[] = [];
+  if (showFavourites) {
+    activeChips.push({ id: 'fav', label: 'Saved', emoji: '\u2764\uFE0F', onRemove: () => setShowFavourites(false) });
+  }
+  if (selectedCommunity) {
+    const def = getCommunityDef(selectedCommunity);
+    activeChips.push({ id: 'community', label: def.title, emoji: def.emoji, onRemove: () => setSelectedCommunity(null) });
+  }
+  if (selectedVibe) {
+    const def = getVibeDef(selectedVibe);
+    activeChips.push({ id: 'vibe', label: def.label, emoji: def.emoji, onRemove: () => setSelectedVibe(null) });
+  }
+  if (dateRange !== 'all') {
+    activeChips.push({
+      id: 'date',
+      label: dateRange === 'week' ? 'This week' : 'This month',
+      emoji: '\u{1F4C5}',
+      onRemove: () => setDateRange('all'),
+    });
+  }
+  for (const id of venueArray) {
+    activeChips.push({
+      id: `venue-${id}`,
+      label: venueNameById.get(id) ?? `Venue #${id}`,
+      emoji: '\u{1F4CD}',
+      onRemove: () => toggleVenue(id),
+    });
   }
 
   return (
@@ -331,31 +372,36 @@ export function EventFeed({ events, venues }: Props) {
         </div>
       )}
 
-      {/* Community lanes */}
-      <CommunityLanes active={selectedCommunity} onSelect={setSelectedCommunity} counts={communityCounts} />
+      {/* Unified filter card — community lanes + mood + vibe + clear all */}
+      <div className="space-y-4 rounded-2xl border border-stone-200 bg-stone-50/60 p-4 dark:border-purple-900/40 dark:bg-[#16101e]/50 sm:p-5">
+        <p className="font-heading text-center text-sm font-bold text-stone-700 dark:text-stone-200">
+          Find your scene
+        </p>
 
-      {/* Mood tiles */}
-      <MoodTiles active={moodCategory} onSelect={handleMoodSelect} counts={categoryCounts} />
+        <CommunityLanes active={selectedCommunity} onSelect={setSelectedCommunity} counts={communityCounts} />
+        <MoodTiles active={selectedVibe} onSelect={setSelectedVibe} counts={vibeCounts} />
 
-      {/* Vibe filter */}
-      <VibeBar active={selectedVibe} onSelect={setSelectedVibe} counts={vibeCounts} />
+        {favouriteIds.length > 0 && (
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={handleShowFavourites}
+              className={`inline-flex items-center gap-2 rounded-full px-5 py-2 text-sm font-bold transition-all active:scale-95 ${
+                showFavourites
+                  ? 'bg-pink-500 text-white shadow-md hover:bg-pink-600 dark:bg-pink-600 dark:hover:bg-pink-500'
+                  : 'border-2 border-pink-300 bg-pink-50 text-pink-600 hover:bg-pink-100 dark:border-pink-700 dark:bg-pink-950/30 dark:text-pink-400 dark:hover:bg-pink-950/50'
+              }`}
+            >
+              <HeartButtonIcon filled={showFavourites} />
+              {showFavourites ? 'All events' : `Saved (${favouriteIds.length})`}
+            </button>
+          </div>
+        )}
+      </div>
 
-      {/* Saved events toggle */}
-      {favouriteIds.length > 0 && (
-        <div className="flex justify-center">
-          <button
-            type="button"
-            onClick={handleShowFavourites}
-            className={`inline-flex items-center gap-2 rounded-full px-5 py-2 text-sm font-bold transition-all active:scale-95 ${
-              showFavourites
-                ? 'bg-pink-500 text-white shadow-md hover:bg-pink-600 dark:bg-pink-600 dark:hover:bg-pink-500'
-                : 'border-2 border-pink-300 bg-pink-50 text-pink-600 hover:bg-pink-100 dark:border-pink-700 dark:bg-pink-950/30 dark:text-pink-400 dark:hover:bg-pink-950/50'
-            }`}
-          >
-            <HeartButtonIcon filled={showFavourites} />
-            {showFavourites ? 'All events' : `Saved (${favouriteIds.length})`}
-          </button>
-        </div>
+      {/* Active filters summary — explicit reminder of current view */}
+      {mounted && (
+        <ActiveFilters count={filtered.length} chips={activeChips} onClearAll={clearAllFilters} />
       )}
 
       {/* For you */}
@@ -368,19 +414,31 @@ export function EventFeed({ events, venues }: Props) {
       {/* Just added */}
       <JustAdded events={justAdded} />
 
-      {/* Quick picks */}
-      <QuickPicks events={filtered} />
-
-      {/* Surprise me */}
-      <SurpriseMe events={filtered} />
-
-      {/* Subscribe to calendar */}
-      <CalendarSubscribe
-        favouriteIds={favouriteIds}
-        venueIds={venueArray}
-        vibe={selectedVibe}
-        community={selectedCommunity}
-      />
+      {/* More ways to explore — collapsed by default to keep the top tidy */}
+      <div>
+        <button
+          type="button"
+          onClick={() => setShowMore(p => !p)}
+          className="inline-flex items-center gap-2 text-sm font-semibold text-stone-500 transition-colors hover:text-fuchsia-600 dark:text-stone-400 dark:hover:text-fuchsia-400"
+        >
+          <svg className={`h-4 w-4 transition-transform ${showMore ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+          </svg>
+          {showMore ? 'Hide extras' : 'More ways to explore — Surprise Me & Calendar'}
+        </button>
+        {showMore && (
+          <div className="mt-4 space-y-8">
+            <QuickPicks events={filtered} />
+            <SurpriseMe events={filtered} />
+            <CalendarSubscribe
+              favouriteIds={favouriteIds}
+              venueIds={venueArray}
+              vibe={selectedVibe}
+              community={selectedCommunity}
+            />
+          </div>
+        )}
+      </div>
 
       {/* Divider */}
       <div className="flex items-center gap-4">
