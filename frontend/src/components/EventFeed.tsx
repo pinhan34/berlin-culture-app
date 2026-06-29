@@ -6,6 +6,7 @@ import { getVenueCategory, type VenueCategory } from '@/lib/venueCategories';
 import { useLocalStorage } from '@/lib/useLocalStorage';
 import { getInteractions, type Interaction } from '@/lib/interactions';
 import { buildTasteProfile, scoreEvent } from '@/lib/recommendations';
+import { getEventVibes, type Vibe } from '@/lib/vibes';
 import { EventCard } from './EventCard';
 import { VenueFilter } from './VenueFilter';
 import { DateFilter } from './DateFilter';
@@ -14,6 +15,7 @@ import { SurpriseMe } from './SurpriseMe';
 import { JustAdded } from './JustAdded';
 import { ForYou } from './ForYou';
 import { MoodTiles } from './MoodTiles';
+import { VibeBar } from './VibeBar';
 
 interface Props {
   events: Event[];
@@ -122,6 +124,7 @@ export function EventFeed({ events, venues }: Props) {
   const [venueArray, setVenueArray] = useLocalStorage<number[]>('bca_venues', []);
   const [dateRange, setDateRange] = useLocalStorage<string>('bca_date', 'all');
   const [favouriteIds, setFavouriteIds] = useLocalStorage<number[]>('bca_favourites', []);
+  const [selectedVibe, setSelectedVibe] = useLocalStorage<Vibe | null>('bca_vibe', null);
 
   // Session-only UI state
   const [showFilters, setShowFilters] = useState(false);
@@ -185,6 +188,13 @@ export function EventFeed({ events, venues }: Props) {
   );
   const hasTaste = mounted && profile.totalSignals >= TASTE_THRESHOLD;
 
+  // Precompute vibe tags per event once.
+  const vibesByEvent = useMemo(() => {
+    const map = new Map<number, Vibe[]>();
+    for (const e of cappedEvents) map.set(e.id, getEventVibes(e));
+    return map;
+  }, [cappedEvents]);
+
   // Fix 1 — category counts for mood tile badges (based on capped, date-bounded set)
   const categoryCounts = useMemo(() => {
     const counts: Partial<Record<VenueCategory, number>> = {};
@@ -196,6 +206,18 @@ export function EventFeed({ events, venues }: Props) {
     return counts;
   }, [cappedEvents, cutoff]);
 
+  // Vibe counts for the vibe filter bar (capped, date-bounded set).
+  const vibeCounts = useMemo(() => {
+    const counts: Partial<Record<Vibe, number>> = {};
+    for (const e of cappedEvents) {
+      if (new Date(e.start_time) > cutoff) continue;
+      for (const v of vibesByEvent.get(e.id) ?? []) {
+        counts[v] = (counts[v] ?? 0) + 1;
+      }
+    }
+    return counts;
+  }, [cappedEvents, cutoff, vibesByEvent]);
+
   const filtered = useMemo(() => {
     return cappedEvents.filter(e => {
       if (showFavourites && !favouriteSet.has(e.id)) return false;
@@ -203,10 +225,11 @@ export function EventFeed({ events, venues }: Props) {
         if (selectedVenues.size > 0 && !selectedVenues.has(e.venue_id)) return false;
         if (moodCategory && getVenueCategory(e.venue_id) !== moodCategory) return false;
       }
+      if (selectedVibe && !(vibesByEvent.get(e.id) ?? []).includes(selectedVibe)) return false;
       if (new Date(e.start_time) > cutoff) return false;
       return true;
     });
-  }, [cappedEvents, selectedVenues, moodCategory, cutoff, showFavourites, favouriteSet]);
+  }, [cappedEvents, selectedVenues, moodCategory, cutoff, showFavourites, favouriteSet, selectedVibe, vibesByEvent]);
 
   const isDefaultView = !moodCategory && selectedVenues.size === 0 && !showFavourites;
 
@@ -286,6 +309,9 @@ export function EventFeed({ events, venues }: Props) {
 
       {/* Mood tiles */}
       <MoodTiles active={moodCategory} onSelect={handleMoodSelect} counts={categoryCounts} />
+
+      {/* Vibe filter */}
+      <VibeBar active={selectedVibe} onSelect={setSelectedVibe} counts={vibeCounts} />
 
       {/* Saved events toggle */}
       {favouriteIds.length > 0 && (

@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import type { Event } from '@/lib/types';
 import { getVenueCategory, CATEGORY_STYLES, getVenueDisplayName } from '@/lib/venueCategories';
+import { getEventVibes, getVibeDef } from '@/lib/vibes';
 import { downloadICS, buildGoogleCalendarUrl, buildOutlookUrl } from '@/lib/ics';
 import { trackInteraction } from '@/lib/interactions';
 
@@ -65,6 +66,7 @@ export function EventCard({ event, highlight, isNew = false, isFavourited = fals
   const category = getVenueCategory(event.venue_id);
   const style = CATEGORY_STYLES[category];
   const urgency = getUrgencyLabel(event.start_time);
+  const vibes = getEventVibes(event).slice(0, 2);
 
   function handleFavouriteClick(e: React.MouseEvent) {
     e.preventDefault();
@@ -118,6 +120,22 @@ export function EventCard({ event, highlight, isNew = false, isFavourited = fals
               </span>
             )}
           </div>
+          {vibes.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {vibes.map(v => {
+                const def = getVibeDef(v);
+                return (
+                  <span
+                    key={v}
+                    className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium ${def.bg} ${def.text} ${def.border}`}
+                  >
+                    <span aria-hidden="true">{def.emoji}</span>
+                    {def.label}
+                  </span>
+                );
+              })}
+            </div>
+          )}
         </div>
         {hasLink && <ArrowIcon />}
       </div>
