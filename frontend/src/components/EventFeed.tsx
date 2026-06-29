@@ -18,6 +18,7 @@ import { ForYou } from './ForYou';
 import { MoodTiles } from './MoodTiles';
 import { VibeBar } from './VibeBar';
 import { CommunityLanes } from './CommunityLanes';
+import { CalendarSubscribe } from './CalendarSubscribe';
 
 interface Props {
   events: Event[];
@@ -372,6 +373,14 @@ export function EventFeed({ events, venues }: Props) {
 
       {/* Surprise me */}
       <SurpriseMe events={filtered} />
+
+      {/* Subscribe to calendar */}
+      <CalendarSubscribe
+        favouriteIds={favouriteIds}
+        venueIds={venueArray}
+        vibe={selectedVibe}
+        community={selectedCommunity}
+      />
 
       {/* Divider */}
       <div className="flex items-center gap-4">

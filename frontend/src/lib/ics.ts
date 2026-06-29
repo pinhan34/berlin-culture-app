@@ -116,9 +116,29 @@ export function buildOutlookUrl(event: Event): string {
   return `https://outlook.live.com/calendar/0/deeplink/compose?${p.toString()}`;
 }
 
+// ─── Subscription feed URL builder ────────────────────────────────────────────
+
+export interface SubscribeParams {
+  favouriteIds?: number[];
+  venueIds?: number[];
+  vibe?: string | null;
+  community?: string | null;
+}
+
+/** Build the relative `/api/calendar` path for a (possibly filtered) feed. */
+export function buildCalendarFeedPath(p: SubscribeParams): string {
+  const qs = new URLSearchParams();
+  if (p.favouriteIds?.length) qs.set('fav', p.favouriteIds.join(','));
+  if (p.venueIds?.length) qs.set('venues', p.venueIds.join(','));
+  if (p.vibe) qs.set('vibe', p.vibe);
+  if (p.community) qs.set('community', p.community);
+  const s = qs.toString();
+  return `/api/calendar${s ? `?${s}` : ''}`;
+}
+
 // ─── Full feed for webcal subscription ────────────────────────────────────────
 
-export function generateFeedICS(events: Event[]): string {
+export function generateFeedICS(events: Event[], calendarName = 'Berlin Culture App'): string {
   const vevents = events.map(e => {
     const start = toICSDate(e.start_time);
     const end   = toICSDate(getEndIso(e));
@@ -143,7 +163,7 @@ export function generateFeedICS(events: Event[]): string {
     'PRODID:-//Berlin Culture App//EN',
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
-    'X-WR-CALNAME:Berlin Culture App',
+    `X-WR-CALNAME:${escapeICS(calendarName)}`,
     'X-WR-TIMEZONE:Europe/Berlin',
     ...vevents,
     'END:VCALENDAR',
