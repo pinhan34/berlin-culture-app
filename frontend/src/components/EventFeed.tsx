@@ -7,6 +7,7 @@ import { useLocalStorage } from '@/lib/useLocalStorage';
 import { getInteractions, type Interaction } from '@/lib/interactions';
 import { buildTasteProfile, scoreEvent } from '@/lib/recommendations';
 import { getEventVibes, type Vibe } from '@/lib/vibes';
+import { getEventCommunities, type Community } from '@/lib/communities';
 import { EventCard } from './EventCard';
 import { VenueFilter } from './VenueFilter';
 import { DateFilter } from './DateFilter';
@@ -16,6 +17,7 @@ import { JustAdded } from './JustAdded';
 import { ForYou } from './ForYou';
 import { MoodTiles } from './MoodTiles';
 import { VibeBar } from './VibeBar';
+import { CommunityLanes } from './CommunityLanes';
 
 interface Props {
   events: Event[];
@@ -125,6 +127,7 @@ export function EventFeed({ events, venues }: Props) {
   const [dateRange, setDateRange] = useLocalStorage<string>('bca_date', 'all');
   const [favouriteIds, setFavouriteIds] = useLocalStorage<number[]>('bca_favourites', []);
   const [selectedVibe, setSelectedVibe] = useLocalStorage<Vibe | null>('bca_vibe', null);
+  const [selectedCommunity, setSelectedCommunity] = useLocalStorage<Community | null>('bca_community', null);
 
   // Session-only UI state
   const [showFilters, setShowFilters] = useState(false);
@@ -195,6 +198,13 @@ export function EventFeed({ events, venues }: Props) {
     return map;
   }, [cappedEvents]);
 
+  // Precompute community membership per event once.
+  const communitiesByEvent = useMemo(() => {
+    const map = new Map<number, Community[]>();
+    for (const e of cappedEvents) map.set(e.id, getEventCommunities(e));
+    return map;
+  }, [cappedEvents]);
+
   // Fix 1 — category counts for mood tile badges (based on capped, date-bounded set)
   const categoryCounts = useMemo(() => {
     const counts: Partial<Record<VenueCategory, number>> = {};
@@ -218,6 +228,18 @@ export function EventFeed({ events, venues }: Props) {
     return counts;
   }, [cappedEvents, cutoff, vibesByEvent]);
 
+  // Community counts for the community lanes (capped, date-bounded set).
+  const communityCounts = useMemo(() => {
+    const counts: Partial<Record<Community, number>> = {};
+    for (const e of cappedEvents) {
+      if (new Date(e.start_time) > cutoff) continue;
+      for (const c of communitiesByEvent.get(e.id) ?? []) {
+        counts[c] = (counts[c] ?? 0) + 1;
+      }
+    }
+    return counts;
+  }, [cappedEvents, cutoff, communitiesByEvent]);
+
   const filtered = useMemo(() => {
     return cappedEvents.filter(e => {
       if (showFavourites && !favouriteSet.has(e.id)) return false;
@@ -226,10 +248,11 @@ export function EventFeed({ events, venues }: Props) {
         if (moodCategory && getVenueCategory(e.venue_id) !== moodCategory) return false;
       }
       if (selectedVibe && !(vibesByEvent.get(e.id) ?? []).includes(selectedVibe)) return false;
+      if (selectedCommunity && !(communitiesByEvent.get(e.id) ?? []).includes(selectedCommunity)) return false;
       if (new Date(e.start_time) > cutoff) return false;
       return true;
     });
-  }, [cappedEvents, selectedVenues, moodCategory, cutoff, showFavourites, favouriteSet, selectedVibe, vibesByEvent]);
+  }, [cappedEvents, selectedVenues, moodCategory, cutoff, showFavourites, favouriteSet, selectedVibe, vibesByEvent, selectedCommunity, communitiesByEvent]);
 
   const isDefaultView = !moodCategory && selectedVenues.size === 0 && !showFavourites;
 
@@ -306,6 +329,9 @@ export function EventFeed({ events, venues }: Props) {
           Updated {timeAgo(lastUpdated)}
         </div>
       )}
+
+      {/* Community lanes */}
+      <CommunityLanes active={selectedCommunity} onSelect={setSelectedCommunity} counts={communityCounts} />
 
       {/* Mood tiles */}
       <MoodTiles active={moodCategory} onSelect={handleMoodSelect} counts={categoryCounts} />
