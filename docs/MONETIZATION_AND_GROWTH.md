@@ -238,3 +238,126 @@ Front-load everything **free**; spend money only after retention is proven.
 8. **Phase 3 partnerships + AI app (MCP)** — differentiated long game.
 
 > **The flywheel:** distribution → traffic → (a) affiliate commissions, (b) email list → Premium subscriptions, (c) audience → promoted listings & venue partnerships. Marketing and monetization are the same loop.
+
+---
+
+## 12. What "affiliate program" means (plain-language)
+
+An **affiliate program** is a **referral deal**: a company gives us a special tracking link, and if someone clicks it and buys, the company pays us a small **commission** (a finder's fee). The buyer pays the same price — our cut comes from the company, not them. (Like a promoter who earns per friend they bring through the door, but automated.)
+
+**Why some platforms offer one and others don't:**
+- **Eventim, Ticketmaster, Eventbrite** are commercial ticketing companies that *want* outside sites sending buyers, so they run public, self-serve affiliate programs.
+- **Resident Advisor (RA) and DICE** do **not** offer a public affiliate program. RA's ticketing serves the scene and its promoters, not outside referrers (it only has *promoter* tools — rep links, promo codes). DICE is partnership-only. So there is **no "sign up and earn" path** on the platforms where most of our best events live.
+
+---
+
+## 13. The `promotedBoost` monetization hook
+
+The feed ranks events by a score (`scoreEvent` in `recommendations.ts`):
+
+```ts
+export function scoreEvent(event, profile, promotedBoost = 0): number {
+  const venueScore = profile.venueScores.get(event.venue_id) ?? 0;
+  const categoryScore = profile.categoryScores[getVenueCategory(event.venue_id)] ?? 0;
+  return venueScore * 2 + categoryScore + promotedBoost;
+}
+```
+
+Today every event is scored with `promotedBoost = 0`, so ranking is purely taste-based and nothing is promoted. The parameter is a **deliberate placeholder** for **promoted events (#21)**:
+
+- A venue/promoter **pays** to be featured higher.
+- We pass a **positive `promotedBoost`** (e.g. `+5`) to lift them.
+- **Works even when the destination has no affiliate program** — we charge for *placement/visibility*, not a ticket sale. This sidesteps the "RA/DICE have no affiliate" problem entirely.
+
+**Still needed to ship it:** (1) a DB flag for which events are paid, (2) a **"Promoted" label** in the UI for honesty, (3) a **cap** on the boost so paid events can't bury genuinely relevant ones (trust = the product).
+
+---
+
+## 14. The niche-content disadvantage & how to overcome it
+
+**The problem in one sentence:** our underground/queer/grassroots events link to RA, DICE, Telegram, or nowhere — none of which pay per-ticket commissions. So **vanilla affiliate cannot monetize our best content.**
+
+**The strategic reframe:** for niche content, don't monetize the **transaction** (the ticket). Monetize the **audience** and the **placement**.
+
+| Strategy | What it is | Monetizes | Realism | Catch |
+|---|---|---|---|---|
+| **Premium subscription (#22)** | Charge power users for perks (personal calendar feeds, alerts, no limits) | The **audience** | ⭐⭐⭐⭐ High | Needs a loyal user base first |
+| **Promoted events (#21)** | Venues pay for higher placement (`promotedBoost`) | The **placement** | ⭐⭐⭐ Medium | Needs enough traffic to sell |
+| **Experiences layer (GetYourGuide/Tiqets)** | Complementary tours/attractions cards | Tourists/planners | ⭐⭐⭐⭐ High (easy) | Adjacent, not the underground itself |
+| **Promoter rep-links (RA Pro)** | Partner with a promoter → trackable link/code | The underground! | ⭐⭐ Medium | Requires relationships, doesn't auto-scale |
+| **Venue promo codes / rev-share** | Venue gives a discount code, we get a kickback | Even Telegram/NULL events | ⭐⭐⭐ Medium | Manual, per-venue |
+| **Donations / "support us"** | Tip jar | Goodwill | ⭐⭐ Low-effort | Small amounts |
+
+**Honest conclusion:** affiliate commissions will only ever be a small side-income for this app because of its niche. The realistic money comes from **Premium subscriptions + promoted placement + a few direct partnerships** (with the **experiences layer** as an easy complementary side-stream — see §15) — monetizing the engaged community and the curation, not the ticket links. That is a **stronger, more defensible business** than affiliate anyway.
+
+---
+
+## 15. How we choose: realism vs strategic fit
+
+The realism star-rating in §14 only measures **"how likely/easy is this to work."** It is **not** the only axis. The second axis is **strategic fit** — how much an option leverages what makes this app special (a curated underground/queer/community feed) and how defensible/on-brand it is. Decisions blend **realism + revenue ceiling + strategic fit**, weighting strategic fit heavily because defensibility comes from the niche identity.
+
+| Option | Realism (ease) | Revenue ceiling | Strategic fit (on-brand / defensible) |
+|---|---|---|---|
+| **Premium (#22)** | ⭐⭐⭐⭐ High | High | ⭐⭐⭐⭐ Very high — monetizes the loyal community |
+| **Promoted events (#21)** | ⭐⭐⭐ Medium | Medium–high | ⭐⭐⭐⭐ High — sells our curation/placement |
+| **Experiences (GYG/Tiqets)** | ⭐⭐⭐⭐ High | Medium | ⭐⭐ Low–medium — **adjacent**, tourist-y, risks feeling off-brand |
+| **Promoter rep-links** | ⭐⭐ Medium-low | Variable | ⭐⭐⭐⭐ Very high — literally the underground |
+| **Venue promo codes** | ⭐⭐⭐ Medium | Low–medium | ⭐⭐⭐ High |
+
+**Is the experiences layer excluded? No.** It is the *easiest* to set up but serves a **different audience** (tourists/planners) than the core (locals, the scene). So it is framed as a **complementary side-stream**, not a core pillar. If a meaningful share of users turn out to be tourists/expats (plausible in Berlin), its strategic fit rises and it becomes more central.
+
+**What "a handful of direct venue/promoter partnerships" means:** a small number (~3–10), **manually arranged**, with specific venues/promoters — not an automated system covering hundreds. They are relationship deals, each set up by hand, each using one mechanism: a **promo code**, an **RA Pro rep-link**, or a **paid "featured" slot**. They do not auto-scale (that is the ⭐⭐ realism), but a handful of the *right* partners is high-value and is the **only realistic way to earn from underground events that have no affiliate program**. "Handful" = start small and manual, with the most important partners.
+
+**Summary of the portfolio:**
+- **Core earners (high fit):** Premium → promoted events → a few promoter/venue partnerships.
+- **Easy complementary earner (lower fit, different audience):** the experiences layer.
+- **Passive baseline (tiny):** affiliate on the minority of mainstream links.
+
+---
+
+## 16. Roadmap: direct venue/promoter partnerships, powered by our scraping
+
+> Key insight: **the scraper is already a curated partnership pipeline.** The adapter list in
+> `src/scrapers/runner.ts` (SO36, Festsaal Kreuzberg, OYA Bar, Gelegenheiten, Flutgraben,
+> Sinema Transtopia, Village Berlin, Telegram groups…) *is* our shortlist of targets — each
+> already carries a `venueId`, and several carry RA club IDs and `website_url`. We don't need
+> to find partners; we already track them.
+
+### Step 1 — Rank targets from data we already have
+Build a simple **partnership scorecard** per venue using existing signals:
+- **Event volume** — count of events per `venue_id` in Supabase (who fills our feed).
+- **Freshness** — how often new rows appear (`created_at`) per venue.
+- **Demand** — clicks per venue, available once **Phase 0** (outbound-click instrumentation) is live.
+
+Score ≈ `clicks × event_volume`. The top ~10 are the partnership shortlist. *No new scraping needed for this step — it's a query over existing data.*
+
+### Step 2 — Enrich targets with contact info (reuse the scraper)
+For each shortlisted venue, get an outreach channel by reusing `fetchEventMeta`-style fetching:
+- Pull the venue's `website_url` / RA club page / Telegram group → extract **email, Instagram, booking contact**.
+- We already know RA club IDs (e.g. SO36 `15179`, Festsaal `132060`, OYA `249089`, Gelegenheiten `88368`) → their RA pages link to the promoter.
+- Output: a small CRM table — *venue, contact, channel, why they fit, current event volume, clicks sent.*
+
+### Step 3 — Outreach with a data-backed pitch (the killer move)
+The scraper + Phase 0 clicks give a **credible, concrete pitch** almost no one else can make:
+> "Your events already appear in our Berlin culture app. Last month we sent **X clicks** to your tickets — for free. Want to turn that into tracked sales?"
+
+Lead with value, then offer **one** simple mechanism:
+- **Promo code** — they give a discount code, we earn a kickback per redemption.
+- **RA Pro rep-link** — they generate a trackable rep link, we earn per sale ([RA Pro promos](https://support.ra.co/article/17-promo-codes)).
+- **Featured slot** — they pay a flat fee to be promoted (uses `promotedBoost`).
+
+Start with **3–5 most-aligned** venues (e.g. SO36, Festsaal Kreuzberg, OYA Bar, plus a queer/ND-aligned promoter).
+
+### Step 4 — Wire the deal into the product
+Each mechanism maps to a small, concrete code change:
+- **Promo code:** store a per-venue code; show it on that venue's event cards ("Use **XYZ** for 10% off"). *Works even for Telegram / `event_url = null` events* — the only path to monetize those.
+- **RA rep-link:** store a per-venue rep link; rewrite that venue's RA `event_url`s to the rep link (this is exactly the Phase 1 link-transform layer, §4).
+- **Featured:** pass a positive `promotedBoost` for that venue's events in `scoreEvent`, plus a **"Promoted"** label and a boost cap (§13).
+
+### Step 5 — Prove value & retain the partner
+Monthly, report back: clicks sent (our tracking) + sales/redemptions (their promo/rep dashboard). Concrete numbers → renew and expand the deal. This is what turns a one-off into recurring revenue.
+
+### Step 6 — Scale carefully
+Add a few partners per quarter. Keep it a **handful** (manual, high-touch) until volume justifies a self-serve partner portal — at which point it graduates into the **promoted events (#21)** product.
+
+**Why this is the realistic path for the underground:** it doesn't depend on RA/DICE offering an affiliate program. It rides on relationships, and the scraper already (a) identifies who to approach, (b) supplies the contact channel, and (c) generates the click data that *is* the pitch.
