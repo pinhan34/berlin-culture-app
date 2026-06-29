@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { EventFeed } from '@/components/EventFeed';
 import { VenueStrip } from '@/components/VenueStrip';
 import { HowItWorks } from '@/components/HowItWorks';
+import { ClickStats } from '@/components/ClickStats';
 import type { Event, Venue } from '@/lib/types';
 
 export const revalidate = 60; // ISR: refresh data every 60 seconds
@@ -70,6 +71,8 @@ export default async function Home() {
       <div className="mb-8">
         <HowItWorks />
       </div>
+
+      <ClickStats />
 
       <VenueStrip venues={venues} />
 

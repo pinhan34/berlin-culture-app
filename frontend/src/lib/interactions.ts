@@ -1,6 +1,8 @@
 /**
  * Interaction tracker — writes to localStorage only, no backend.
- * Step 3 (AI recommendations) will read this history to find patterns.
+ * Step 3 (AI recommendations) reads this history to find patterns.
+ * Phase 0 (monetization) also records the click destination so we can see
+ * which ticketing platforms / venues our outbound traffic actually goes to.
  *
  * Keys used:
  *   bca_interactions  — last 200 raw interaction events
@@ -15,6 +17,26 @@ export interface Interaction {
   eventId: number;
   timestamp: number;
   action: InteractionAction;
+  /** Destination host of the outbound link (e.g. "ra.co"), if known. */
+  domain?: string;
+  /** Venue the event belongs to, for per-venue traffic stats. */
+  venueId?: number;
+}
+
+export interface InteractionMeta {
+  domain?: string | null;
+  venueId?: number;
+}
+
+/** Extracts a clean hostname ("ra.co") from a URL, or null if it can't be parsed. */
+export function extractDomain(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    return host.replace(/^www\./, '');
+  } catch {
+    return null;
+  }
 }
 
 function safeRead(): Interaction[] {
@@ -26,12 +48,18 @@ function safeRead(): Interaction[] {
   }
 }
 
-export function trackInteraction(eventId: number, action: InteractionAction): void {
+export function trackInteraction(
+  eventId: number,
+  action: InteractionAction,
+  meta?: InteractionMeta,
+): void {
   try {
+    const entry: Interaction = { eventId, timestamp: Date.now(), action };
+    if (meta?.domain) entry.domain = meta.domain;
+    if (typeof meta?.venueId === 'number') entry.venueId = meta.venueId;
+
     const history = safeRead();
-    const next = [...history, { eventId, timestamp: Date.now(), action }].slice(
-      -MAX_INTERACTIONS,
-    );
+    const next = [...history, entry].slice(-MAX_INTERACTIONS);
     localStorage.setItem(INTERACTIONS_KEY, JSON.stringify(next));
   } catch {
     // storage unavailable — silently skip
@@ -41,4 +69,43 @@ export function trackInteraction(eventId: number, action: InteractionAction): vo
 /** Returns the full interaction history. Used by the Step 3 AI layer. */
 export function getInteractions(): Interaction[] {
   return safeRead();
+}
+
+export interface StatRow<T> {
+  key: T;
+  count: number;
+}
+
+/**
+ * Phase 0 measurement: outbound clicks grouped by destination domain,
+ * sorted most-clicked first. Note: localStorage is per-browser, so this
+ * reflects THIS browser only — a backend table is the upgrade path for
+ * true cross-user aggregate data.
+ */
+export function getClicksByDomain(): StatRow<string>[] {
+  const counts = new Map<string, number>();
+  for (const it of safeRead()) {
+    if (it.action !== 'click' || !it.domain) continue;
+    counts.set(it.domain, (counts.get(it.domain) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .map(([key, count]) => ({ key, count }))
+    .sort((a, b) => b.count - a.count);
+}
+
+/** Phase 0 measurement: outbound clicks grouped by venue id, most-clicked first. */
+export function getClicksByVenue(): StatRow<number>[] {
+  const counts = new Map<number, number>();
+  for (const it of safeRead()) {
+    if (it.action !== 'click' || typeof it.venueId !== 'number') continue;
+    counts.set(it.venueId, (counts.get(it.venueId) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .map(([key, count]) => ({ key, count }))
+    .sort((a, b) => b.count - a.count);
+}
+
+/** Total number of tracked outbound clicks (with or without a known domain). */
+export function getTotalClicks(): number {
+  return safeRead().filter((it) => it.action === 'click').length;
 }

@@ -5,7 +5,7 @@ import type { Event } from '@/lib/types';
 import { getVenueCategory, CATEGORY_STYLES, getVenueDisplayName } from '@/lib/venueCategories';
 import { getEventVibes, getVibeDef } from '@/lib/vibes';
 import { downloadICS, buildGoogleCalendarUrl, buildOutlookUrl } from '@/lib/ics';
-import { trackInteraction } from '@/lib/interactions';
+import { trackInteraction, extractDomain } from '@/lib/interactions';
 
 const SHORT_DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -75,7 +75,10 @@ export function EventCard({ event, highlight, isNew = false, isFavourited = fals
   }
 
   function handleCardClick() {
-    trackInteraction(event.id, 'click');
+    trackInteraction(event.id, 'click', {
+      domain: extractDomain(event.event_url),
+      venueId: event.venue_id,
+    });
   }
 
   const hasLink = !!event.event_url;
@@ -199,7 +202,7 @@ function CalendarDropdown({ event }: { event: Event }) {
   function pick(e: React.MouseEvent, action: () => void) {
     e.preventDefault();
     e.stopPropagation();
-    trackInteraction(event.id, 'calendar');
+    trackInteraction(event.id, 'calendar', { venueId: event.venue_id });
     action();
     setOpen(false);
   }
