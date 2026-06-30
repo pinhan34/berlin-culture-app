@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import type { Event } from '@/lib/types';
-import { getVenueCategory, CATEGORY_STYLES, getVenueDisplayName } from '@/lib/venueCategories';
+import { getVenueCategory, CATEGORY_STYLES, getVenueDisplayName, isAggregatorVenue, parseTitleVenue } from '@/lib/venueCategories';
 import { getEventVibes, getVibeDef } from '@/lib/vibes';
 import { downloadICS, buildGoogleCalendarUrl, buildOutlookUrl } from '@/lib/ics';
 import { trackInteraction, extractDomain } from '@/lib/interactions';
@@ -63,7 +63,14 @@ interface Props {
 }
 
 export function EventCard({ event, highlight, isNew = false, isFavourited = false, onFavouriteToggle, onHide }: Props) {
-  const venueName = getVenueDisplayName(event.venue_id, event.venue?.name ?? `Venue #${event.venue_id}`);
+  const sourceName = getVenueDisplayName(event.venue_id, event.venue?.name ?? `Venue #${event.venue_id}`);
+  // For aggregator sources, surface the real venue parsed from "Name @ Venue".
+  const parsed = isAggregatorVenue(event.venue_id)
+    ? parseTitleVenue(event.title)
+    : { title: event.title, venue: null };
+  const displayTitle = parsed.title;
+  const venueName = parsed.venue ?? sourceName;
+  const viaSource = parsed.venue ? sourceName : null;
   const category = getVenueCategory(event.venue_id);
   const style = CATEGORY_STYLES[category];
   const urgency = getUrgencyLabel(event.start_time);
@@ -113,7 +120,7 @@ export function EventCard({ event, highlight, isNew = false, isFavourited = fals
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <h3 className={`text-[15px] font-semibold leading-snug line-clamp-2 ${hasLink ? 'group-hover:text-fuchsia-600 dark:group-hover:text-fuchsia-400' : ''} text-stone-900 dark:text-stone-100`}>
-            {event.title}
+            {displayTitle}
           </h3>
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
             <span className="inline-flex items-center gap-1 text-sm font-medium text-fuchsia-700 dark:text-fuchsia-400">
@@ -151,10 +158,13 @@ export function EventCard({ event, highlight, isNew = false, isFavourited = fals
       </div>
 
       <div className="mt-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className={`inline-block rounded-md border px-2 py-0.5 text-xs font-medium ${style.bg} ${style.text} ${style.border}`}>
+        <div className="flex min-w-0 items-center gap-1.5">
+          <span className={`inline-block max-w-[180px] truncate rounded-md border px-2 py-0.5 text-xs font-medium ${style.bg} ${style.text} ${style.border}`}>
             {venueName}
           </span>
+          {viaSource && (
+            <span className="truncate text-[10px] text-stone-400 dark:text-stone-500">via {viaSource}</span>
+          )}
           {!hasLink && (
             <span className="text-[10px] text-stone-400 dark:text-stone-500">no link available</span>
           )}

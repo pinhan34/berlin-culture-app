@@ -158,9 +158,17 @@ const VENUE_DISPLAY_CAP = 30;
 /** Telegram venue id — events without a real external URL are excluded. */
 const TELEGRAM_VENUE_ID = 7;
 
-/** Sinema Transtopia gets a lower cap so it doesn't crowd out Art at Berlin in the Art category. */
+/**
+ * Per-source display caps (Phase 1 — tame feed domination; see docs/VENUE_MODEL.md).
+ * High-volume aggregators (Telegram, Village, MeetUp) get tighter caps so they
+ * don't crowd out brick-and-mortar venues. Phase 2 moves this to per-real-venue.
+ */
 const VENUE_CAP_OVERRIDES: Record<number, number> = {
   1: 15, // Sinema Transtopia — many screenings, keep balanced with gallery events
+  2: 12, // MeetUp Groups (aggregator)
+  3: 12, // Village Berlin (aggregator / reposts a lot)
+  7: 12, // Telegram — QUEER EVENTS Berlin (aggregator)
+  8: 18, // ART at Berlin (gallery aggregator, but exhibitions are valuable)
 };
 
 function isQualityEvent(e: Event): boolean {

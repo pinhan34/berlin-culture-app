@@ -31,6 +31,37 @@ export function getVenueDisplayName(venueId: number, dbName: string): string {
   return VENUE_DISPLAY_NAME_MAP[venueId] ?? dbName;
 }
 
+/**
+ * "Aggregator" sources stand in for many independent events at many real
+ * venues (a Telegram group, MeetUp bundle, a reposting space, a gallery
+ * aggregator) — as opposed to a single brick-and-mortar venue where source =
+ * venue. See docs/VENUE_MODEL.md.
+ */
+const AGGREGATOR_VENUE_IDS = new Set<number>([
+  2, // MeetUp Groups
+  3, // Village Berlin
+  7, // Telegram (QUEER EVENTS Berlin)
+  8, // ART at Berlin
+]);
+
+export function isAggregatorVenue(venueId: number): boolean {
+  return AGGREGATOR_VENUE_IDS.has(venueId);
+}
+
+/**
+ * Phase 1 (presentation-only): the real venue is embedded in aggregator titles
+ * as "Event name @ Venue". Split it back out for display. Returns the original
+ * title and a null venue when no separator is present.
+ */
+export function parseTitleVenue(title: string): { title: string; venue: string | null } {
+  const idx = title.lastIndexOf(' @ ');
+  if (idx === -1) return { title, venue: null };
+  const name = title.slice(0, idx).trim();
+  const venue = title.slice(idx + 3).trim();
+  if (!name || !venue) return { title, venue: null };
+  return { title: name, venue };
+}
+
 export const CATEGORY_STYLES: Record<VenueCategory, { bg: string; text: string; border: string; label: string }> = {
   art: {
     bg: 'bg-teal-50 dark:bg-teal-950/40',
