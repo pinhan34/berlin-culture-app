@@ -5,7 +5,8 @@ import type { Event, Venue } from '@/lib/types';
 import { getVenueDisplayName } from '@/lib/venueCategories';
 import { useLocalStorage } from '@/lib/useLocalStorage';
 import { getInteractions, type Interaction } from '@/lib/interactions';
-import { buildTasteProfile, scoreEvent } from '@/lib/recommendations';
+import { buildTasteProfile, scoreEvent, explainEvent, type TasteHints } from '@/lib/recommendations';
+import { getTasteHints, recordVibeHint, recordCommunityHint } from '@/lib/tasteHints';
 import { getEventVibes, VIBE_DEFS, getVibeDef, type Vibe } from '@/lib/vibes';
 import { getEventCommunities, getCommunityDef, type Community } from '@/lib/communities';
 import { EventCard } from './EventCard';
@@ -175,6 +176,7 @@ export function EventFeed({ events, venues }: Props) {
   const [favouriteIds, setFavouriteIds] = useLocalStorage<number[]>('bca_favourites', []);
   const [selectedVibe, setSelectedVibe] = useLocalStorage<Vibe | null>('bca_vibe', null);
   const [selectedCommunity, setSelectedCommunity] = useLocalStorage<Community | null>('bca_community', null);
+  const [hiddenIds, setHiddenIds] = useLocalStorage<number[]>('bca_hidden', []);
 
   // Session-only UI state
   const [showFavourites, setShowFavourites] = useState(false);
@@ -182,6 +184,7 @@ export function EventFeed({ events, venues }: Props) {
 
   const selectedVenues = useMemo(() => new Set(venueArray), [venueArray]);
   const favouriteSet = useMemo(() => new Set(favouriteIds), [favouriteIds]);
+  const hiddenSet = useMemo(() => new Set(hiddenIds), [hiddenIds]);
 
   const dateWindow = useMemo(() => getDateWindow(dateRange), [dateRange]);
 
@@ -226,9 +229,11 @@ export function EventFeed({ events, venues }: Props) {
   // Avoid hydration mismatch: load client-only signals (timestamps, taste) after mount.
   const [mounted, setMounted] = useState(false);
   const [interactions, setInteractions] = useState<Interaction[]>([]);
+  const [hints, setHints] = useState<TasteHints>({});
   useEffect(() => {
     setMounted(true);
     setInteractions(getInteractions());
+    setHints(getTasteHints());
   }, []);
 
   // Discard a persisted vibe that no longer exists (e.g. the retired "queer"
@@ -240,8 +245,8 @@ export function EventFeed({ events, venues }: Props) {
 
   // Taste profile from local signals (clicks, calendar saves, favourites).
   const profile = useMemo(
-    () => buildTasteProfile(cappedEvents, interactions, favouriteIds),
-    [cappedEvents, interactions, favouriteIds],
+    () => buildTasteProfile(cappedEvents, interactions, favouriteIds, hiddenIds, hints),
+    [cappedEvents, interactions, favouriteIds, hiddenIds, hints],
   );
   const hasTaste = mounted && profile.totalSignals >= TASTE_THRESHOLD;
 
@@ -268,6 +273,7 @@ export function EventFeed({ events, venues }: Props) {
       e: Event,
       skip?: { vibe?: boolean; community?: boolean; venue?: boolean },
     ): boolean => {
+      if (hiddenSet.has(e.id)) return false;
       if (showFavourites) {
         if (!favouriteSet.has(e.id)) return false;
       } else if (!skip?.venue && selectedVenues.size > 0 && !selectedVenues.has(e.venue_id)) {
@@ -279,7 +285,7 @@ export function EventFeed({ events, venues }: Props) {
       if (t < dateWindow.start || t > dateWindow.end) return false;
       return true;
     },
-    [showFavourites, favouriteSet, selectedVenues, selectedVibe, vibesByEvent, selectedCommunity, communitiesByEvent, dateWindow],
+    [hiddenSet, showFavourites, favouriteSet, selectedVenues, selectedVibe, vibesByEvent, selectedCommunity, communitiesByEvent, dateWindow],
   );
 
   const filtered = useMemo(() => cappedEvents.filter(e => passes(e)), [cappedEvents, passes]);
@@ -358,6 +364,20 @@ export function EventFeed({ events, venues }: Props) {
     );
   }
 
+  function handleHide(eventId: number) {
+    setHiddenIds(prev => (prev.includes(eventId) ? prev : [...prev, eventId]));
+  }
+
+  function handleSelectVibe(vibe: Vibe | null) {
+    setSelectedVibe(vibe);
+    if (vibe) setHints(recordVibeHint(vibe));
+  }
+
+  function handleSelectCommunity(community: Community | null) {
+    setSelectedCommunity(community);
+    if (community) setHints(recordCommunityHint(community));
+  }
+
   function handleShowFavourites() {
     setShowFavourites(prev => !prev);
   }
@@ -419,11 +439,11 @@ export function EventFeed({ events, venues }: Props) {
       {/* ───────── Unified filter panel: 4 distinct, numbered filters ───────── */}
       <div className="space-y-4 rounded-2xl border border-stone-200 bg-gradient-to-b from-stone-50 to-stone-100/40 p-3 dark:border-purple-900/40 dark:from-[#16101e]/70 dark:to-[#120c1a]/40 sm:p-4">
         <FilterSection step={1} emoji={'\u{1F3AD}'} title="Find your scene" accent="fuchsia">
-          <CommunityLanes active={selectedCommunity} onSelect={setSelectedCommunity} counts={communityCounts} />
+          <CommunityLanes active={selectedCommunity} onSelect={handleSelectCommunity} counts={communityCounts} />
         </FilterSection>
 
         <FilterSection step={2} emoji={'\u2728'} title="What are you in the mood for?" accent="amber">
-          <MoodTiles active={selectedVibe} onSelect={setSelectedVibe} counts={vibeCounts} />
+          <MoodTiles active={selectedVibe} onSelect={handleSelectVibe} counts={vibeCounts} />
         </FilterSection>
 
         <FilterSection step={3} emoji={'\u{1F4CD}'} title="Find your venue" accent="violet">
@@ -462,6 +482,22 @@ export function EventFeed({ events, venues }: Props) {
         <ActiveFilters count={filtered.length} chips={activeChips} onClearAll={clearAllFilters} />
       )}
 
+      {/* Hidden events notice — let users undo "Not for me" */}
+      {mounted && hiddenIds.length > 0 && (
+        <div className="flex items-center justify-center gap-2 text-xs text-stone-400 dark:text-stone-500">
+          <span>
+            {hiddenIds.length} event{hiddenIds.length !== 1 ? 's' : ''} hidden
+          </span>
+          <button
+            type="button"
+            onClick={() => setHiddenIds([])}
+            className="font-semibold text-fuchsia-600 underline-offset-2 hover:underline dark:text-fuchsia-400"
+          >
+            Show all again
+          </button>
+        </div>
+      )}
+
       {/* Surprise me — eye-catching animated reveal of the wheel */}
       <div>
         <button
@@ -496,6 +532,7 @@ export function EventFeed({ events, venues }: Props) {
         events={forYou}
         isFavourited={(id) => favouriteSet.has(id)}
         onFavouriteToggle={handleFavouriteToggle}
+        reasonsOf={(e) => explainEvent(e, profile)}
       />
 
       {/* Just added */}
@@ -542,6 +579,7 @@ export function EventFeed({ events, venues }: Props) {
                       isNew={isFreshData && newIds.has(event.id)}
                       isFavourited={favouriteSet.has(event.id)}
                       onFavouriteToggle={handleFavouriteToggle}
+                      onHide={handleHide}
                     />
                   </div>
                 ))}

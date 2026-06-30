@@ -110,8 +110,16 @@ const CATEGORY_FALLBACK: Record<VenueCategory, Vibe> = {
 /**
  * Classify an event into one or more vibes, ordered by salience.
  * Always returns at least one vibe (keyword match, else a category fallback).
+ *
+ * Memoized by event id — classification is content-static per id and this is
+ * now called repeatedly inside taste scoring / feed sorting.
  */
+const vibeCache = new Map<number, Vibe[]>();
+
 export function getEventVibes(event: Event): Vibe[] {
+  const cached = vibeCache.get(event.id);
+  if (cached) return cached;
+
   const haystack = `${event.title} ${event.venue?.name ?? ''}`;
   const result: Vibe[] = [];
   for (const def of VIBE_DEFS) {
@@ -120,5 +128,7 @@ export function getEventVibes(event: Event): Vibe[] {
   if (result.length === 0) {
     result.push(CATEGORY_FALLBACK[getVenueCategory(event.venue_id)]);
   }
+
+  vibeCache.set(event.id, result);
   return result;
 }

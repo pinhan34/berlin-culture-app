@@ -59,9 +59,10 @@ interface Props {
   isNew?: boolean;
   isFavourited?: boolean;
   onFavouriteToggle?: (id: number) => void;
+  onHide?: (id: number) => void;
 }
 
-export function EventCard({ event, highlight, isNew = false, isFavourited = false, onFavouriteToggle }: Props) {
+export function EventCard({ event, highlight, isNew = false, isFavourited = false, onFavouriteToggle, onHide }: Props) {
   const venueName = getVenueDisplayName(event.venue_id, event.venue?.name ?? `Venue #${event.venue_id}`);
   const category = getVenueCategory(event.venue_id);
   const style = CATEGORY_STYLES[category];
@@ -72,6 +73,12 @@ export function EventCard({ event, highlight, isNew = false, isFavourited = fals
     e.preventDefault();
     e.stopPropagation();
     onFavouriteToggle?.(event.id);
+  }
+
+  function handleHideClick(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    onHide?.(event.id);
   }
 
   function handleCardClick() {
@@ -154,6 +161,15 @@ export function EventCard({ event, highlight, isNew = false, isFavourited = fals
         </div>
         <div className="flex items-center gap-2">
           <CalendarDropdown event={event} />
+          {onHide && (
+            <button
+              onClick={handleHideClick}
+              title="Not for me — show fewer like this"
+              className="inline-flex items-center justify-center rounded-md border border-stone-200 bg-white p-1.5 text-stone-400 transition-all hover:border-stone-400 hover:bg-stone-50 hover:text-stone-600 active:scale-95 dark:border-purple-900/40 dark:bg-[#16101e] dark:text-stone-500 dark:hover:border-purple-700/60 dark:hover:text-stone-300"
+            >
+              <NotForMeIcon />
+            </button>
+          )}
           <button
             onClick={handleFavouriteClick}
             title={isFavourited ? 'Remove from favourites' : 'Save to favourites'}
@@ -310,6 +326,14 @@ function AppleIcon() {
   return (
     <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="currentColor">
       <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98l-.09.06c-.22.15-2.19 1.28-2.17 3.81.03 3.02 2.65 4.03 2.68 4.04l-.06.27ZM13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11Z"/>
+    </svg>
+  );
+}
+
+function NotForMeIcon() {
+  return (
+    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" />
     </svg>
   );
 }

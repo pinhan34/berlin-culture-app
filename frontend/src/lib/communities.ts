@@ -57,8 +57,16 @@ export function getCommunityDef(community: Community): CommunityDef {
   return COMMUNITY_BY_KEY.get(community)!;
 }
 
-/** Which communities an event belongs to (zero, one, or both). */
+/**
+ * Which communities an event belongs to (zero, one, or both).
+ * Memoized by event id — called repeatedly in taste scoring / feed sorting.
+ */
+const communityCache = new Map<number, Community[]>();
+
 export function getEventCommunities(event: Event): Community[] {
+  const cached = communityCache.get(event.id);
+  if (cached) return cached;
+
   const result: Community[] = [];
   const haystack = `${event.title} ${event.venue?.name ?? ''}`;
 
@@ -66,5 +74,7 @@ export function getEventCommunities(event: Event): Community[] {
   if (event.venue_id === ND_VENUE_ID || ND_RE.test(haystack)) {
     result.push('neurodivergent');
   }
+
+  communityCache.set(event.id, result);
   return result;
 }
