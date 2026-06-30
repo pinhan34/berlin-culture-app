@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, type ReactNode } from 'react';
 import type { Event, Venue } from '@/lib/types';
 import { getVenueDisplayName } from '@/lib/venueCategories';
 import { useLocalStorage } from '@/lib/useLocalStorage';
@@ -53,18 +53,62 @@ function timeAgo(ms: number): string {
   return `${diffD} day${diffD !== 1 ? 's' : ''} ago`;
 }
 
-function getDateCutoff(range: string): Date {
+function startOfDay(d: Date): Date { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; }
+function endOfDay(d: Date): Date { const x = new Date(d); x.setHours(23, 59, 59, 999); return x; }
+
+/**
+ * Resolve a date filter value into a [start, end] window (ms). Supports presets
+ * (today / tomorrow / weekend / week / month / all) plus a specific YYYY-MM-DD.
+ */
+function getDateWindow(range: string): { start: number; end: number } {
   const now = new Date();
-  if (range === 'week') {
-    const end = new Date(now);
-    end.setDate(end.getDate() + (7 - end.getDay()));
-    end.setHours(23, 59, 59, 999);
-    return end;
+  const FAR = new Date(9999, 11, 31).getTime();
+  switch (range) {
+    case 'today':
+      return { start: now.getTime(), end: endOfDay(now).getTime() };
+    case 'tomorrow': {
+      const t = startOfDay(now); t.setDate(t.getDate() + 1);
+      return { start: t.getTime(), end: endOfDay(t).getTime() };
+    }
+    case 'weekend': {
+      const day = now.getDay(); // 0 Sun .. 6 Sat
+      const sat = startOfDay(now);
+      sat.setDate(sat.getDate() + ((6 - day + 7) % 7));
+      const sun = new Date(sat); sun.setDate(sun.getDate() + 1);
+      const start = (day === 0 || day === 6) ? now.getTime() : sat.getTime();
+      return { start, end: endOfDay(sun).getTime() };
+    }
+    case 'week': {
+      const end = endOfDay(now); end.setDate(end.getDate() + (7 - now.getDay()));
+      return { start: now.getTime(), end: end.getTime() };
+    }
+    case 'month':
+      return { start: now.getTime(), end: new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999).getTime() };
+    case 'all':
+      return { start: 0, end: FAR };
+    default: {
+      const d = new Date(`${range}T00:00:00`);
+      if (!Number.isNaN(d.getTime())) return { start: startOfDay(d).getTime(), end: endOfDay(d).getTime() };
+      return { start: 0, end: FAR };
+    }
   }
-  if (range === 'month') {
-    return new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+}
+
+function dateRangeLabel(range: string): string {
+  switch (range) {
+    case 'today': return 'Today';
+    case 'tomorrow': return 'Tomorrow';
+    case 'weekend': return 'This weekend';
+    case 'week': return 'This week';
+    case 'month': return 'This month';
+    case 'all': return 'All upcoming';
+    default: {
+      const d = new Date(`${range}T00:00:00`);
+      return Number.isNaN(d.getTime())
+        ? 'All upcoming'
+        : d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+    }
   }
-  return new Date(9999, 11, 31);
 }
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -133,14 +177,13 @@ export function EventFeed({ events, venues }: Props) {
   const [selectedCommunity, setSelectedCommunity] = useLocalStorage<Community | null>('bca_community', null);
 
   // Session-only UI state
-  const [showFilters, setShowFilters] = useState(false);
   const [showFavourites, setShowFavourites] = useState(false);
   const [showMore, setShowMore] = useState(false);
 
   const selectedVenues = useMemo(() => new Set(venueArray), [venueArray]);
   const favouriteSet = useMemo(() => new Set(favouriteIds), [favouriteIds]);
 
-  const cutoff = useMemo(() => getDateCutoff(dateRange), [dateRange]);
+  const dateWindow = useMemo(() => getDateWindow(dateRange), [dateRange]);
 
   // Quality filter + per-venue cap + URL-level dedup — applied before any user filtering.
   const cappedEvents = useMemo(() => {
@@ -232,10 +275,11 @@ export function EventFeed({ events, venues }: Props) {
       }
       if (!skip?.vibe && selectedVibe && !(vibesByEvent.get(e.id) ?? []).includes(selectedVibe)) return false;
       if (!skip?.community && selectedCommunity && !(communitiesByEvent.get(e.id) ?? []).includes(selectedCommunity)) return false;
-      if (new Date(e.start_time) > cutoff) return false;
+      const t = new Date(e.start_time).getTime();
+      if (t < dateWindow.start || t > dateWindow.end) return false;
       return true;
     },
-    [showFavourites, favouriteSet, selectedVenues, selectedVibe, vibesByEvent, selectedCommunity, communitiesByEvent, cutoff],
+    [showFavourites, favouriteSet, selectedVenues, selectedVibe, vibesByEvent, selectedCommunity, communitiesByEvent, dateWindow],
   );
 
   const filtered = useMemo(() => cappedEvents.filter(e => passes(e)), [cappedEvents, passes]);
@@ -348,7 +392,7 @@ export function EventFeed({ events, venues }: Props) {
   if (dateRange !== 'all') {
     activeChips.push({
       id: 'date',
-      label: dateRange === 'week' ? 'This week' : 'This month',
+      label: dateRangeLabel(dateRange),
       emoji: '\u{1F4C5}',
       onRemove: () => setDateRange('all'),
     });
@@ -372,30 +416,58 @@ export function EventFeed({ events, venues }: Props) {
         </div>
       )}
 
-      {/* Unified filter card — community lanes + mood + vibe + clear all */}
-      <div className="space-y-4 rounded-2xl border border-stone-200 bg-stone-50/60 p-4 dark:border-purple-900/40 dark:bg-[#16101e]/50 sm:p-5">
-        <p className="font-heading text-center text-sm font-bold text-stone-700 dark:text-stone-200">
-          Find your scene
-        </p>
+      {/* ───────── Unified filter panel: 4 filters in one place ───────── */}
+      <div className="space-y-5 rounded-2xl border border-stone-200 bg-stone-50/60 p-4 dark:border-purple-900/40 dark:bg-[#16101e]/50 sm:p-5">
+        {/* 1 · Find your scene */}
+        <div className="space-y-3">
+          <FilterHeading>Find your scene</FilterHeading>
+          <CommunityLanes active={selectedCommunity} onSelect={setSelectedCommunity} counts={communityCounts} />
+        </div>
 
-        <CommunityLanes active={selectedCommunity} onSelect={setSelectedCommunity} counts={communityCounts} />
+        <PanelDivider />
+
+        {/* 2 · What are you in the mood for? */}
         <MoodTiles active={selectedVibe} onSelect={setSelectedVibe} counts={vibeCounts} />
 
+        <PanelDivider />
+
+        {/* 3 · Find your venue */}
+        <div className="space-y-3">
+          <FilterHeading>Find your venue</FilterHeading>
+          <VenueFilter
+            venues={venues}
+            selected={selectedVenues}
+            onToggle={toggleVenue}
+            onClear={() => setVenueArray([])}
+          />
+        </div>
+
+        <PanelDivider />
+
+        {/* 4 · When are you free? */}
+        <div className="space-y-3">
+          <FilterHeading>When are you free?</FilterHeading>
+          <DateFilter value={dateRange} onChange={setDateRange} />
+        </div>
+
         {favouriteIds.length > 0 && (
-          <div className="flex justify-center">
-            <button
-              type="button"
-              onClick={handleShowFavourites}
-              className={`inline-flex items-center gap-2 rounded-full px-5 py-2 text-sm font-bold transition-all active:scale-95 ${
-                showFavourites
-                  ? 'bg-pink-500 text-white shadow-md hover:bg-pink-600 dark:bg-pink-600 dark:hover:bg-pink-500'
-                  : 'border-2 border-pink-300 bg-pink-50 text-pink-600 hover:bg-pink-100 dark:border-pink-700 dark:bg-pink-950/30 dark:text-pink-400 dark:hover:bg-pink-950/50'
-              }`}
-            >
-              <HeartButtonIcon filled={showFavourites} />
-              {showFavourites ? 'All events' : `Saved (${favouriteIds.length})`}
-            </button>
-          </div>
+          <>
+            <PanelDivider />
+            <div className="flex justify-center">
+              <button
+                type="button"
+                onClick={handleShowFavourites}
+                className={`inline-flex items-center gap-2 rounded-full px-5 py-2 text-sm font-bold transition-all active:scale-95 ${
+                  showFavourites
+                    ? 'bg-pink-500 text-white shadow-md hover:bg-pink-600 dark:bg-pink-600 dark:hover:bg-pink-500'
+                    : 'border-2 border-pink-300 bg-pink-50 text-pink-600 hover:bg-pink-100 dark:border-pink-700 dark:bg-pink-950/30 dark:text-pink-400 dark:hover:bg-pink-950/50'
+                }`}
+              >
+                <HeartButtonIcon filled={showFavourites} />
+                {showFavourites ? 'All events' : `Saved (${favouriteIds.length})`}
+              </button>
+            </div>
+          </>
         )}
       </div>
 
@@ -403,6 +475,35 @@ export function EventFeed({ events, venues }: Props) {
       {mounted && (
         <ActiveFilters count={filtered.length} chips={activeChips} onClearAll={clearAllFilters} />
       )}
+
+      {/* Surprise me — eye-catching animated reveal of the wheel */}
+      <div>
+        <button
+          type="button"
+          onClick={() => setShowMore(p => !p)}
+          className="group relative flex w-full items-center justify-center gap-3 overflow-hidden rounded-2xl bg-gradient-to-r from-fuchsia-600 via-pink-500 to-amber-400 px-6 py-4 shadow-lg transition-all hover:shadow-xl hover:brightness-110 active:scale-[0.99]"
+        >
+          <span className="animate-bounce text-2xl" aria-hidden="true">{'\u{1F3B2}'}</span>
+          <span className="font-heading text-base font-extrabold tracking-tight text-white drop-shadow sm:text-lg">
+            {showMore ? 'Hide the surprise' : 'Still not decided? Spin for a surprise!'}
+          </span>
+          <span className="animate-bounce text-2xl [animation-delay:150ms]" aria-hidden="true">{'\u2728'}</span>
+          <span className="pointer-events-none absolute inset-y-0 -left-1/2 w-1/3 -skew-x-12 bg-white/30 blur-md transition-all duration-700 group-hover:left-[120%]" />
+        </button>
+
+        {showMore && (
+          <div className="mt-5 space-y-8">
+            <SurpriseMe events={filtered} />
+            <QuickPicks events={filtered} />
+            <CalendarSubscribe
+              favouriteIds={favouriteIds}
+              venueIds={venueArray}
+              vibe={selectedVibe}
+              community={selectedCommunity}
+            />
+          </div>
+        )}
+      </div>
 
       {/* For you */}
       <ForYou
@@ -414,32 +515,6 @@ export function EventFeed({ events, venues }: Props) {
       {/* Just added */}
       <JustAdded events={justAdded} />
 
-      {/* More ways to explore — collapsed by default to keep the top tidy */}
-      <div>
-        <button
-          type="button"
-          onClick={() => setShowMore(p => !p)}
-          className="inline-flex items-center gap-2 text-sm font-semibold text-stone-500 transition-colors hover:text-fuchsia-600 dark:text-stone-400 dark:hover:text-fuchsia-400"
-        >
-          <svg className={`h-4 w-4 transition-transform ${showMore ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-          </svg>
-          {showMore ? 'Hide extras' : 'More ways to explore — Surprise Me & Calendar'}
-        </button>
-        {showMore && (
-          <div className="mt-4 space-y-8">
-            <QuickPicks events={filtered} />
-            <SurpriseMe events={filtered} />
-            <CalendarSubscribe
-              favouriteIds={favouriteIds}
-              venueIds={venueArray}
-              vibe={selectedVibe}
-              community={selectedCommunity}
-            />
-          </div>
-        )}
-      </div>
-
       {/* Divider */}
       <div className="flex items-center gap-4">
         <div className="h-px flex-1 bg-stone-200 dark:bg-purple-900/40" />
@@ -447,39 +522,6 @@ export function EventFeed({ events, venues }: Props) {
           Browse everything
         </span>
         <div className="h-px flex-1 bg-stone-200 dark:bg-purple-900/40" />
-      </div>
-
-      {/* Collapsible filters */}
-      <div>
-        <button
-          type="button"
-          onClick={() => { setShowFilters(prev => !prev); }}
-          className={`mb-3 inline-flex cursor-pointer items-center gap-2 rounded-full px-5 py-2.5 text-sm font-bold uppercase tracking-wide transition-all active:scale-95 ${
-            showFilters || selectedVenues.size > 0 || dateRange !== 'all'
-              ? 'bg-fuchsia-600 text-white shadow-md hover:bg-fuchsia-700 dark:bg-fuchsia-500 dark:hover:bg-fuchsia-600'
-              : 'border-2 border-fuchsia-400 bg-fuchsia-50 text-fuchsia-700 shadow-sm hover:bg-fuchsia-100 hover:shadow-md dark:border-fuchsia-600 dark:bg-fuchsia-950/30 dark:text-fuchsia-300 dark:hover:bg-fuchsia-950/50'
-          }`}
-        >
-          <svg className={`h-4 w-4 transition-transform ${showFilters ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-          </svg>
-          Filter &amp; Explore
-          {(selectedVenues.size > 0 || dateRange !== 'all') && (
-            <span className="inline-block h-2 w-2 rounded-full bg-white dark:bg-fuchsia-200" />
-          )}
-        </button>
-
-        {showFilters && (
-          <div className="space-y-3 rounded-xl border border-stone-200 bg-stone-50/50 p-4 dark:border-purple-900/40 dark:bg-[#16101e]/50">
-            <VenueFilter
-              venues={venues}
-              selected={selectedVenues}
-              onToggle={toggleVenue}
-              onClear={() => setVenueArray([])}
-            />
-            <DateFilter value={dateRange} onChange={setDateRange} />
-          </div>
-        )}
       </div>
 
       <p className="animate-fade-up font-heading text-lg font-bold text-stone-700 dark:text-stone-200">
@@ -524,6 +566,18 @@ export function EventFeed({ events, venues }: Props) {
       )}
     </div>
   );
+}
+
+function FilterHeading({ children }: { children: ReactNode }) {
+  return (
+    <p className="font-heading text-center text-sm font-bold text-stone-600 dark:text-stone-300">
+      {children}
+    </p>
+  );
+}
+
+function PanelDivider() {
+  return <div className="h-px bg-stone-200/70 dark:bg-purple-900/30" />;
 }
 
 function HeartButtonIcon({ filled }: { filled: boolean }) {
