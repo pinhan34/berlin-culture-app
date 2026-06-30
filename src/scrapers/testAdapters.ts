@@ -6,6 +6,8 @@ import { ResidentAdvisorAdapter } from './adapters/residentAdvisor.js';
 import { FlutgrabenAdapter } from './adapters/flutgraben.js';
 import { TelegramGroupAdapter } from './adapters/telegram.js';
 import { ArtAtBerlinAdapter } from './adapters/artAtBerlin.js';
+import { So36Adapter } from './adapters/so36.js';
+import { FestsaalKreuzbergAdapter } from './adapters/festsaalKreuzberg.js';
 import dotenv from 'dotenv';
 import type { WebsiteAdapter, NormalizedEvent } from './interfaces.js';
 
@@ -106,6 +108,8 @@ async function main() {
                 keywords: /.*/,
             },
         ]),
+        so36: new So36Adapter(),
+        festsaal: new FestsaalKreuzbergAdapter(),
         flutgraben: new FlutgrabenAdapter(),
         telegram: new TelegramGroupAdapter(7,
             (process.env['TELEGRAM_GROUP_IDS'] ?? '').split(',').filter(Boolean),

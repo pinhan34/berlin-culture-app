@@ -8,6 +8,8 @@ import { ResidentAdvisorAdapter } from './adapters/residentAdvisor.js';
 import { FlutgrabenAdapter } from './adapters/flutgraben.js';
 import { TelegramGroupAdapter } from './adapters/telegram.js';
 import { ArtAtBerlinAdapter } from './adapters/artAtBerlin.js';
+import { So36Adapter } from './adapters/so36.js';
+import { FestsaalKreuzbergAdapter } from './adapters/festsaalKreuzberg.js';
 
 // 1. Initialize environment configuration variables
 dotenv.config();
@@ -49,19 +51,11 @@ async function runOrchestrator() {
             'berlin-neurodivergent-community',
         ]),
         new VillageBerlinAdapter(),
+        // SO36 (5) and Festsaal Kreuzberg (9) now use dedicated site adapters
+        // below — far richer than RA's sparse listings. OYA Bar (10) has no
+        // scrapable programme on its own site, and Gelegenheiten (11) has no
+        // standalone site, so both stay on RA as a best-effort fallback.
         new ResidentAdvisorAdapter([
-            {
-                clubId: '15179',
-                name: 'SO36',
-                venueId: 5,
-                keywords: /.*/,
-            },
-            {
-                clubId: '132060',
-                name: 'Festsaal Kreuzberg',
-                venueId: 9,
-                keywords: /.*/,
-            },
             {
                 clubId: '249089',
                 name: 'OYA Bar',
@@ -75,6 +69,8 @@ async function runOrchestrator() {
                 keywords: /.*/,
             },
         ]),
+        new So36Adapter(),
+        new FestsaalKreuzbergAdapter(),
         new FlutgrabenAdapter(),
         new ArtAtBerlinAdapter(),
         // Telegram last: GramJS can fire uncaughtException on session errors.
