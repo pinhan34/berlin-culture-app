@@ -24,12 +24,8 @@ const MOODS: { vibe: Vibe; emoji: string; question: string }[] = [
 
 export function MoodTiles({ onSelect, active, counts }: Props) {
   return (
-    <div className="space-y-3">
-      <p className="font-heading text-center text-sm font-bold text-stone-600 dark:text-stone-300">
-        What are you in the mood for?
-      </p>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        {MOODS.map(({ vibe, emoji, question }, i) => {
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+      {MOODS.map(({ vibe, emoji, question }, i) => {
           const def = getVibeDef(vibe);
           const isActive = active === vibe;
           const count = counts?.[vibe] ?? 0;
@@ -53,8 +49,7 @@ export function MoodTiles({ onSelect, active, counts }: Props) {
               </span>
             </button>
           );
-        })}
-      </div>
+      })}
     </div>
   );
 }

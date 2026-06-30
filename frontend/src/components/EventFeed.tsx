@@ -416,58 +416,44 @@ export function EventFeed({ events, venues }: Props) {
         </div>
       )}
 
-      {/* ───────── Unified filter panel: 4 filters in one place ───────── */}
-      <div className="space-y-5 rounded-2xl border border-stone-200 bg-stone-50/60 p-4 dark:border-purple-900/40 dark:bg-[#16101e]/50 sm:p-5">
-        {/* 1 · Find your scene */}
-        <div className="space-y-3">
-          <FilterHeading>Find your scene</FilterHeading>
+      {/* ───────── Unified filter panel: 4 distinct, numbered filters ───────── */}
+      <div className="space-y-4 rounded-2xl border border-stone-200 bg-gradient-to-b from-stone-50 to-stone-100/40 p-3 dark:border-purple-900/40 dark:from-[#16101e]/70 dark:to-[#120c1a]/40 sm:p-4">
+        <FilterSection step={1} emoji={'\u{1F3AD}'} title="Find your scene" accent="fuchsia">
           <CommunityLanes active={selectedCommunity} onSelect={setSelectedCommunity} counts={communityCounts} />
-        </div>
+        </FilterSection>
 
-        <PanelDivider />
+        <FilterSection step={2} emoji={'\u2728'} title="What are you in the mood for?" accent="amber">
+          <MoodTiles active={selectedVibe} onSelect={setSelectedVibe} counts={vibeCounts} />
+        </FilterSection>
 
-        {/* 2 · What are you in the mood for? */}
-        <MoodTiles active={selectedVibe} onSelect={setSelectedVibe} counts={vibeCounts} />
-
-        <PanelDivider />
-
-        {/* 3 · Find your venue */}
-        <div className="space-y-3">
-          <FilterHeading>Find your venue</FilterHeading>
+        <FilterSection step={3} emoji={'\u{1F4CD}'} title="Find your venue" accent="violet">
           <VenueFilter
             venues={venues}
             selected={selectedVenues}
             onToggle={toggleVenue}
             onClear={() => setVenueArray([])}
           />
-        </div>
+        </FilterSection>
 
-        <PanelDivider />
-
-        {/* 4 · When are you free? */}
-        <div className="space-y-3">
-          <FilterHeading>When are you free?</FilterHeading>
+        <FilterSection step={4} emoji={'\u{1F5D3}\uFE0F'} title="When are you free?" accent="emerald">
           <DateFilter value={dateRange} onChange={setDateRange} />
-        </div>
+        </FilterSection>
 
         {favouriteIds.length > 0 && (
-          <>
-            <PanelDivider />
-            <div className="flex justify-center">
-              <button
-                type="button"
-                onClick={handleShowFavourites}
-                className={`inline-flex items-center gap-2 rounded-full px-5 py-2 text-sm font-bold transition-all active:scale-95 ${
-                  showFavourites
-                    ? 'bg-pink-500 text-white shadow-md hover:bg-pink-600 dark:bg-pink-600 dark:hover:bg-pink-500'
-                    : 'border-2 border-pink-300 bg-pink-50 text-pink-600 hover:bg-pink-100 dark:border-pink-700 dark:bg-pink-950/30 dark:text-pink-400 dark:hover:bg-pink-950/50'
-                }`}
-              >
-                <HeartButtonIcon filled={showFavourites} />
-                {showFavourites ? 'All events' : `Saved (${favouriteIds.length})`}
-              </button>
-            </div>
-          </>
+          <div className="flex justify-center pt-1">
+            <button
+              type="button"
+              onClick={handleShowFavourites}
+              className={`inline-flex items-center gap-2 rounded-full px-5 py-2 text-sm font-bold transition-all active:scale-95 ${
+                showFavourites
+                  ? 'bg-pink-500 text-white shadow-md hover:bg-pink-600 dark:bg-pink-600 dark:hover:bg-pink-500'
+                  : 'border-2 border-pink-300 bg-pink-50 text-pink-600 hover:bg-pink-100 dark:border-pink-700 dark:bg-pink-950/30 dark:text-pink-400 dark:hover:bg-pink-950/50'
+              }`}
+            >
+              <HeartButtonIcon filled={showFavourites} />
+              {showFavourites ? 'All events' : `Saved (${favouriteIds.length})`}
+            </button>
+          </div>
         )}
       </div>
 
@@ -568,16 +554,61 @@ export function EventFeed({ events, venues }: Props) {
   );
 }
 
-function FilterHeading({ children }: { children: ReactNode }) {
-  return (
-    <p className="font-heading text-center text-sm font-bold text-stone-600 dark:text-stone-300">
-      {children}
-    </p>
-  );
-}
+type Accent = 'fuchsia' | 'amber' | 'violet' | 'emerald';
 
-function PanelDivider() {
-  return <div className="h-px bg-stone-200/70 dark:bg-purple-900/30" />;
+const SECTION_ACCENTS: Record<Accent, { badge: string; title: string; ring: string }> = {
+  fuchsia: {
+    badge: 'from-fuchsia-500 to-pink-500',
+    title: 'from-fuchsia-600 to-pink-500 dark:from-fuchsia-400 dark:to-pink-400',
+    ring: 'border-fuchsia-200/80 dark:border-fuchsia-900/40',
+  },
+  amber: {
+    badge: 'from-amber-500 to-orange-500',
+    title: 'from-amber-600 to-orange-500 dark:from-amber-400 dark:to-orange-400',
+    ring: 'border-amber-200/80 dark:border-amber-900/40',
+  },
+  violet: {
+    badge: 'from-violet-500 to-purple-500',
+    title: 'from-violet-600 to-purple-500 dark:from-violet-400 dark:to-purple-400',
+    ring: 'border-violet-200/80 dark:border-violet-900/40',
+  },
+  emerald: {
+    badge: 'from-emerald-500 to-teal-500',
+    title: 'from-emerald-600 to-teal-500 dark:from-emerald-400 dark:to-teal-400',
+    ring: 'border-emerald-200/80 dark:border-emerald-900/40',
+  },
+};
+
+function FilterSection({
+  step,
+  emoji,
+  title,
+  accent,
+  children,
+}: {
+  step: number;
+  emoji: string;
+  title: string;
+  accent: Accent;
+  children: ReactNode;
+}) {
+  const a = SECTION_ACCENTS[accent];
+  return (
+    <section className={`rounded-xl border bg-white/70 p-4 shadow-sm dark:bg-[#1a1326]/40 ${a.ring}`}>
+      <div className="mb-3 flex items-center gap-2.5">
+        <span
+          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br text-sm font-extrabold text-white shadow-sm ${a.badge}`}
+        >
+          {step}
+        </span>
+        <h3 className="font-heading flex items-center gap-1.5 text-base font-extrabold tracking-tight sm:text-lg">
+          <span aria-hidden="true">{emoji}</span>
+          <span className={`bg-gradient-to-r bg-clip-text text-transparent ${a.title}`}>{title}</span>
+        </h3>
+      </div>
+      {children}
+    </section>
+  );
 }
 
 function HeartButtonIcon({ filled }: { filled: boolean }) {
