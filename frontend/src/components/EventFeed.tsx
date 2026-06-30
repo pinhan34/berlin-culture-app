@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, useCallback, type ReactNode } from 'react
 import type { Event, Venue } from '@/lib/types';
 import { getVenueDisplayName } from '@/lib/venueCategories';
 import { useLocalStorage } from '@/lib/useLocalStorage';
-import { getInteractions, type Interaction } from '@/lib/interactions';
+import { getInteractions, syncInteraction, type Interaction } from '@/lib/interactions';
 import { buildTasteProfile, scoreEvent, explainEvent, type TasteHints } from '@/lib/recommendations';
 import { getTasteHints, recordVibeHint, recordCommunityHint } from '@/lib/tasteHints';
 import { getEventVibes, VIBE_DEFS, getVibeDef, type Vibe } from '@/lib/vibes';
@@ -185,6 +185,11 @@ export function EventFeed({ events, venues }: Props) {
   const selectedVenues = useMemo(() => new Set(venueArray), [venueArray]);
   const favouriteSet = useMemo(() => new Set(favouriteIds), [favouriteIds]);
   const hiddenSet = useMemo(() => new Set(hiddenIds), [hiddenIds]);
+  const eventById = useMemo(() => {
+    const m = new Map<number, Event>();
+    for (const e of events) m.set(e.id, e);
+    return m;
+  }, [events]);
 
   const dateWindow = useMemo(() => getDateWindow(dateRange), [dateRange]);
 
@@ -359,12 +364,17 @@ export function EventFeed({ events, venues }: Props) {
   }
 
   function handleFavouriteToggle(eventId: number) {
+    const adding = !favouriteSet.has(eventId);
     setFavouriteIds(prev =>
       prev.includes(eventId) ? prev.filter(id => id !== eventId) : [...prev, eventId],
     );
+    if (adding) syncInteraction(eventId, 'favourite', { venueId: eventById.get(eventId)?.venue_id });
   }
 
   function handleHide(eventId: number) {
+    if (!hiddenSet.has(eventId)) {
+      syncInteraction(eventId, 'hide', { venueId: eventById.get(eventId)?.venue_id });
+    }
     setHiddenIds(prev => (prev.includes(eventId) ? prev : [...prev, eventId]));
   }
 

@@ -9,19 +9,23 @@ and what is **planned** across all three tiers.
 | Tier | Theme | Status |
 | --- | --- | --- |
 | **Tier 1** | Local, free, no-backend taste learning | ✅ **Done** |
-| **Tier 2** | Durable + cross-device + aggregate (Supabase) | 🔜 Planned |
+| **Tier 2a** | Server-side interaction collection (Supabase) | ✅ **Done (code)** · ⏳ migration to run |
+| **Tier 2b** | Aggregate features: Trending + collaborative | 🔜 Planned (needs traffic) |
 | **Tier 3** | Semantic / ML recommendations (pgvector) | 🔜 Planned |
 
-> Where we are: the local engine now learns across **four dimensions** (venue,
+> Where we are: the local engine learns across **four dimensions** (venue,
 > category, vibe, community), decays with time, takes negative signals, and
-> explains itself. The next unlock (Tier 2) is making it **durable and
-> cross-user**, which turns per-browser taste into a real product asset.
+> explains itself. **Tier 2a** now also streams those signals to Supabase
+> (anonymous, no PII), building the server-side data foundation. The remaining
+> unlock (Tier 2b) — Trending + collaborative — is built once there's enough
+> traffic for aggregates to be meaningful.
 
 ---
 
 ## Foundations — signals & storage (recap)
 
-All Tier-1 data lives in the browser's `localStorage` (no backend yet):
+Tier-1 taste lives in the browser's `localStorage`; Tier-2a additionally mirrors
+signals to Supabase (anonymous, no PII):
 
 | Key | Holds |
 | --- | --- |
@@ -29,9 +33,11 @@ All Tier-1 data lives in the browser's `localStorage` (no backend yet):
 | `bca_favourites` | Favourited event ids |
 | `bca_hidden` | "Not for me" event ids |
 | `bca_taste_hints` | Counts of vibe/community filters the user picked |
+| `bca_anon_id` | Anonymous per-browser UUID for server-side collection (Tier 2a) |
 
 Core pipeline: `buildTasteProfile()` → `scoreEvent()` / `explainEvent()` in
-`frontend/src/lib/recommendations.ts`.
+`frontend/src/lib/recommendations.ts`. Server write path:
+`syncInteraction()` → `POST /api/track` → `interactions` table.
 
 ---
 
@@ -90,40 +96,55 @@ all client-side and privacy-friendly.
 
 ---
 
-## 🔜 Tier 2 — Durable, cross-device & aggregate (Supabase)
+## ✅ Tier 2a — Server-side interaction collection (DONE — code)
 
-**Goal:** stop being per-browser. Persist signals server-side so taste survives
-cache clears, syncs across devices, and — crucially — **aggregates across all
-users** to power "Trending in Berlin" and basic collaborative filtering.
+**Goal:** stop being purely per-browser. Stream every signal to Supabase under an
+anonymous id, building the server-side data foundation that the aggregate
+features (2b) and real cross-user analytics need.
+
+> Note on the anonymous (no-login) choice: 2a's deliverable is **server-side
+> data collection + the foundation for 2b**, not personal cross-device sync.
+> True "my taste follows me to a new phone" requires login (deliberately
+> deferred). With anonymous ids, a new device/browser is a new id.
 
 ### Checklist
-- [ ] Anonymous identity (`bca_anon_id`, `crypto.randomUUID()`, localStorage)
-- [ ] `interactions` table in Supabase + RLS (anon insert only)
-- [ ] Write path: `POST /api/track` (dual-write alongside localStorage at first)
-- [ ] One-time migration of existing localStorage history → server
+- [x] Anonymous identity (`bca_anon_id`, `crypto.randomUUID()`) — `lib/anonId.ts`
+- [x] `interactions` table + indexes + RLS — `supabase/migrations/002_interactions.sql`
+- [x] Write path: `POST /api/track` (service-role insert + validation) — `app/api/track/route.ts`
+- [x] Client dual-write for clicks / calendar / favourite / hide — `lib/interactions.ts`, `EventFeed.tsx`
+- [x] Robust delivery via `navigator.sendBeacon` (survives click navigation), `fetch(keepalive)` fallback
+- [ ] **Run the migration** in the Supabase SQL Editor (only remaining step)
+- [ ] Minimal privacy notice (recommended now that data is server-side)
+
+### What shipped
+- **Schema** (`002_interactions.sql`): `interactions(id, anon_id, event_id,
+  venue_id, action, domain, created_at)` with `action` constrained to
+  `click | calendar | favourite | hide`, plus indexes on `event_id`, `anon_id`,
+  `created_at`.
+- **Security:** RLS is **enabled with no client policies** — anon/authenticated
+  roles can neither read nor write directly. All writes use the service role via
+  the API route; aggregate reads (2b) will be service-role only. No PII is stored.
+- **Resilience:** `/api/track` is best-effort and never surfaces infra errors;
+  if the table/env is missing it no-ops with `ok: false`, so the app keeps working
+  before the migration is applied. The local Tier-1 engine is unchanged.
+
+### Action required
+Apply `supabase/migrations/002_interactions.sql` in the Supabase dashboard.
+`SUPABASE_SERVICE_ROLE_KEY` is already configured (shared with the admin route),
+so no new env vars are needed. Data collection begins the moment the table exists.
+
+---
+
+## 🔜 Tier 2b — Aggregate features (planned, needs traffic)
+
+**Goal:** turn the collected data into cross-user value. Deferred until there's
+enough traffic for aggregates to be meaningful (empty otherwise).
+
+### Checklist
 - [ ] Aggregate read: `GET /api/trending` (most-engaged upcoming events)
 - [ ] "Trending in Berlin" row in the feed
-- [ ] Basic collaborative filtering: co-occurrence ("people who saved X also saved Y")
-- [ ] Minimal privacy notice / consent for cross-session storage
-
-### Proposed schema
-```sql
-create table interactions (
-  id          bigint generated always as identity primary key,
-  anon_id     uuid not null,
-  event_id    bigint not null references events(id) on delete cascade,
-  venue_id    int,
-  action      text not null check (action in ('click','calendar','favourite','hide')),
-  domain      text,
-  created_at  timestamptz not null default now()
-);
-create index on interactions (event_id);
-create index on interactions (anon_id);
-create index on interactions (created_at);
-```
-
-RLS: allow anonymous `insert` only; reads happen through aggregated, server-side
-endpoints (service role) so raw rows are never exposed to clients.
+- [ ] Collaborative filtering: co-occurrence ("people who saved X also saved Y")
+- [ ] Optional: `scoreEvent` aggregate-popularity term (global nudges personal)
 
 ### Trending (aggregate signal)
 ```sql
@@ -148,20 +169,17 @@ events most frequently liked by the same `anon_id`s. No ML needed — a couple o
 SQL joins. This is the "people who liked X also liked Y" lane.
 
 ### How it folds into the existing model
-The client still builds a local `TasteProfile`; Tier 2 simply (a) makes its
-inputs durable and (b) adds two **global** rows — "Trending" and
-"Others also liked" — that complement the personal ones. `scoreEvent` can later
-take an aggregate-popularity term so global signal nudges personal ranking.
+The client still builds a local `TasteProfile`; 2b adds two **global** rows —
+"Trending" and "Others also liked" — that complement the personal ones.
+`scoreEvent` can later take an aggregate-popularity term so global signal nudges
+personal ranking.
 
 ### Effort & risks
-- **Effort:** ~1–2 days (table + 2 API routes + 2 feed rows + migration).
-- **Risks:** privacy expectations (mitigate with anonymous ids + a clear notice);
-  bot/duplicate inflation of trending (debounce + rate-limit writes);
+- **Effort:** ~1 day (2 API routes + 2 feed rows) on top of 2a.
+- **Risks:** bot/duplicate inflation of trending (debounce + rate-limit writes);
   keep it cheap (Supabase free tier is fine at this scale).
 
 ### Acceptance criteria
-- Taste persists after clearing localStorage / on a second device (same `anon_id`
-  flow or sign-in later).
 - "Trending in Berlin" reflects real aggregate engagement and excludes hides.
 - No raw per-user rows are readable from the client.
 
@@ -221,10 +239,14 @@ lane, then blend once tuned.
 ## Cross-cutting
 
 ### Privacy
-- **Today:** nothing leaves the browser — a strong, honest stance worth
-  surfacing in the UI.
-- **Tier 2+:** keep identifiers **anonymous by default**, add a minimal notice,
-  and never expose raw per-user rows to clients.
+- **Tier 1:** the personal taste profile is built and stored **entirely in the
+  browser** — nothing personal leaves the device for ranking.
+- **Tier 2a (now live in code):** anonymous engagement signals are mirrored to
+  Supabase under a random `bca_anon_id` (no PII, no account). Raw per-user rows
+  are **not** client-readable (RLS with no policies); only service-role API
+  routes touch them, and 2b will expose **aggregates only**.
+- **Action item:** now that behavioural data is stored server-side, add a short
+  privacy notice (GDPR — Berlin/Germany). Keep identifiers anonymous by default.
 
 ### Monetization alignment
 `scoreEvent(event, profile, promotedBoost)` already carries the `promotedBoost`
@@ -235,12 +257,13 @@ ranking **without rearchitecting** — see `docs/MONETIZATION_AND_GROWTH.md`.
 - Click-through rate on **For you** vs. the chronological feed.
 - **Hide** rate (high = recommendations are off; also a quality signal).
 - Calendar-save and favourite rates per surface.
-- Once Tier 2 lands: trending coverage and collaborative-lane CTR.
+- Once Tier 2b lands: trending coverage and collaborative-lane CTR.
 
 ---
 
 ## Recommended sequence
 1. ✅ **Tier 1** — done.
-2. 🔜 **Tier 2** — biggest strategic unlock (durable + aggregate). Do this next.
-3. 🔜 **Tier 3** — once Tier-2 data shows which dimensions matter and there's
-   enough signal to make embeddings worthwhile.
+2. ✅ **Tier 2a** — done (code). Remaining: run the migration + add a privacy notice.
+3. 🔜 **Tier 2b** — build once there's traffic for aggregates to be meaningful.
+4. 🔜 **Tier 3** — once data shows which dimensions matter and there's enough
+   signal to make embeddings worthwhile.

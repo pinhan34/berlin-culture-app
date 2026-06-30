@@ -8,10 +8,15 @@
  *   bca_interactions  — last 200 raw interaction events
  */
 
+import { getAnonId } from './anonId';
+
 const INTERACTIONS_KEY = 'bca_interactions';
 const MAX_INTERACTIONS = 200;
 
 export type InteractionAction = 'click' | 'calendar';
+
+/** Actions sent to the server (superset of local InteractionAction). */
+export type ServerAction = InteractionAction | 'favourite' | 'hide';
 
 export interface Interaction {
   eventId: number;
@@ -73,6 +78,46 @@ export function trackInteraction(
     localStorage.setItem(INTERACTIONS_KEY, JSON.stringify(next));
   } catch {
     // storage unavailable — silently skip
+  }
+
+  // Tier 2a — also send to the server (best-effort, never blocks the UX).
+  syncInteraction(eventId, action, meta);
+}
+
+/**
+ * Best-effort server write (Personalization Tier 2a). Uses sendBeacon so the
+ * request survives the outbound navigation that follows a click; falls back to
+ * fetch(keepalive). Silently no-ops if there's no anon id or storage.
+ */
+export function syncInteraction(
+  eventId: number,
+  action: ServerAction,
+  meta?: InteractionMeta,
+): void {
+  try {
+    const anonId = getAnonId();
+    if (!anonId) return;
+
+    const payload = JSON.stringify({
+      anonId,
+      eventId,
+      action,
+      venueId: typeof meta?.venueId === 'number' ? meta.venueId : undefined,
+      domain: meta?.domain ?? undefined,
+    });
+
+    if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
+      navigator.sendBeacon('/api/track', new Blob([payload], { type: 'application/json' }));
+      return;
+    }
+    void fetch('/api/track', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: payload,
+      keepalive: true,
+    }).catch(() => {});
+  } catch {
+    // best-effort — ignore
   }
 }
 
