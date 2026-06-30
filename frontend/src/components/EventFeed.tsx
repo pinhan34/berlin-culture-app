@@ -479,7 +479,7 @@ export function EventFeed({ events, venues }: Props) {
 
         {showMore && (
           <div className="mt-5 space-y-8">
-            <SurpriseMe events={filtered} />
+            <SurpriseMe events={filtered} favouriteIds={favouriteIds} />
             <QuickPicks events={filtered} />
             <CalendarSubscribe
               favouriteIds={favouriteIds}
