@@ -85,6 +85,15 @@ export function HowItWorks() {
       >
         Got it &mdash; show me events
       </button>
+
+      <p className="mt-4 flex items-start gap-1.5 text-[11px] leading-relaxed text-stone-400 dark:text-stone-500">
+        <span aria-hidden="true">🔒</span>
+        <span>
+          Your taste profile stays on your device. We also log anonymous usage
+          signals &mdash; which events get clicked, saved or hidden &mdash; to power
+          trending &amp; recommendations. No account, and never your name, email or location.
+        </span>
+      </p>
     </section>
   );
 }
