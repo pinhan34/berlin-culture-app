@@ -459,6 +459,40 @@ German-facing site and also required for affiliate networks (Awin/Eventim) later
 click data → *then* §16 partnerships. A is a gate; B is the cheapest win; C is what
 actually creates the audience that makes monetization (and partnership pitches) possible.
 
+### Plain-language: what the manual tasks mean (and what needs *you*)
+The GEO pieces and the *scaffolding* of the legal pages are already built in code. Three
+things can't be automated because they need real-world info or a judgement call:
+
+**1. Fill the placeholders in `/impressum` and `/privacy`.**
+The two pages (`frontend/src/app/impressum/page.tsx`, `frontend/src/app/privacy/page.tsx`)
+contain blanks in square brackets — e.g. `[Full name]`, `[Street and number]`,
+`[your@email.tld]`, `[date]`. Replace each with your real details.
+- *Why:* §5 DDG legally requires a public site to show a real **Impressum** (a name +
+  reachable contact); the privacy policy needs a real "controller" + contact.
+- *Caveat:* the Impressum must carry a real **postal address**. If you don't want your home
+  address public, use a business/service address, or check whether a lighter rule applies to
+  a purely private, non-commercial project. Worth a quick check with someone who knows German
+  web law before you actively market. (This doc is not legal advice.)
+
+**2. Decide on cookie/consent (see §17-A).**
+The app stores functional data in the browser (favourites, an anonymous id) and logs
+**anonymous analytics** (the `interactions` clicks). In the EU/Germany, functional storage
+is fine without asking; *analytics* is safer if you **ask permission first** via a small
+**consent banner**. Today there is **no banner**, and the privacy policy uses a
+**legitimate-interest** basis ("we don't have to ask because it's anonymous/non-invasive").
+Pick one:
+- **(a) Keep as-is** — no banner, legitimate interest. Simpler, slightly more risk.
+- **(b) Add a lightweight consent banner** — "Allow anonymous analytics? Yes/No"; only log
+  interactions on Yes. Safer; a small dedicated build. **← chosen: to be implemented.**
+
+**3. Two share/trust follow-ups.**
+- **Branded OG image:** when the link is pasted into WhatsApp/IG/Reddit, platforms show a
+  preview card with a picture. There's no image yet, so the card looks bare. A 1200×630
+  branded image fixes this (can be auto-generated — no design work). **← to be implemented.**
+- **Custom domain:** the app currently lives at `berlin-culture-app.vercel.app`, which reads
+  as "demo." A real domain (e.g. `berlinculture.app`, ~€10–30/yr) pointed at Vercel improves
+  trust + press. This is a purchase + a Vercel settings step (owner action).
+
 ---
 
 ## 18. Full distribution channel catalog (Berlin-specific)
@@ -622,3 +656,111 @@ Same motion everywhere, only the format changes: **Reddit** = a genuinely helpfu
 3. **A capture point on the app** (newsletter signup / calendar subscribe — partly built) so
    traffic converts into an **owned** audience instead of leaking away.
 4. **(Recommended) a custom domain** for trust.
+
+### Per-channel step-by-step playbooks
+Concrete "what to actually do" for each channel — the same shape as the Instagram
+example above. **Setup** = one-time; **Weekly** = the recurring motion. Always append a
+UTM (`?utm_source=<channel>`) to the link so you can see what works.
+
+**Instagram** — *see the full worked example above.* In short: create `@berlinculture`,
+put the app link in bio, post a Thursday "this weekend" Reel + community carousels + daily
+"just added" Stories, funnel taps from the bio link to the app.
+
+**TikTok**
+1. Setup: create the account; put the app link in bio (available once you hit the follower
+   threshold, otherwise link in every caption/pinned comment).
+2. Weekly: re-upload the *same* vertical Reels you made for Instagram (don't reinvent).
+3. Use 3–5 Berlin hashtags + a trending sound; hook in the first 1.5 seconds.
+4. Reply to comments asking "where?" with the app link.
+
+**YouTube Shorts**
+1. Setup: create a channel; add the app link to the channel banner + descriptions.
+2. Weekly: upload the same vertical clips; write a keyword title ("Things to do in Berlin
+   this weekend") — Shorts are searchable, so they keep working long after posting.
+
+**Facebook (Page + Events)**
+1. Setup: create a Page; link it to Instagram via **Meta Business Suite** so posts
+   cross-publish automatically.
+2. Weekly: let IG posts mirror to FB; additionally create a **Facebook Event** for 1–2
+   flagship happenings (older/expat crowd RSVPs here) with the app link in the description.
+
+**Email newsletter** (highest-value owned channel)
+1. Setup: pick a free-tier tool (Buttondown, MailerLite, Substack); add a **signup box on
+   the app** (a small "get the weekly Berlin digest" field).
+2. Weekly: send one "Berlin this week" email built from the feed — 8–12 events, each linking
+   back to the app. Keep a consistent day/time.
+3. Every email should invite a reply and a forward (referral).
+
+**Telegram channel**
+1. Setup: create a public channel ("Berlin Tonight"); pin a short "what this is" + app link.
+2. Daily/weekly: post 3–5 picks with the event link; you can partly automate this from the
+   same data the app uses.
+
+**WhatsApp Channel**
+1. Setup: create a Channel from a WhatsApp Business profile; share the join link on IG/site.
+2. Weekly: broadcast nightly/weekly picks (short, 1–3 events + link). One-to-many, no replies
+   to manage.
+
+**Reddit** (participation, not promotion)
+1. Setup: make an account; spend a week genuinely commenting so you're not a brand-new
+   account dropping links (that gets removed).
+2. Weekly: find "what's on this weekend?" threads in r/berlin, r/askberlin,
+   r/berlinsocialclub and **answer helpfully**, linking the app only where it truly helps.
+3. If mods allow, post a weekly curated list. Bonus: Reddit answers get cited by AI engines
+   (feeds §9 GEO).
+
+**Facebook Groups**
+1. Setup: join relevant groups (expat, queer, neurodivergent, student, newcomer).
+2. Weekly: participate for real; share event picks where the group welcomes it. Read each
+   group's rules first — value first, link second.
+
+**Meetup**
+1. Setup: create an organiser profile.
+2. Recurring: list/host a small "Berlin culture" meetup; cross-reference community events.
+   Put the app link in every event description.
+
+**SEO (Google)**
+1. Setup: submit the sitemap in **Google Search Console** (verify the domain once).
+2. Ongoing: keep pages fast + structured (JSON-LD already added). Consider a few evergreen
+   landing pages ("queer events in Berlin", "free things to do in Berlin") that rank and
+   funnel to the live feed.
+
+**GEO (ChatGPT / Perplexity / Google AI)**
+1. Setup: robots.txt allowing AI crawlers + Event JSON-LD (both done in §17-B).
+2. Ongoing: build a Reddit footprint (see above); periodically **test** by asking
+   ChatGPT/Perplexity "what's on in Berlin this weekend?" and check whether you're named.
+
+**Berlin listing sites & press** (get featured)
+1. Setup: make a one-page **press kit** — what the app is, 3–4 screenshots, the
+   curated-underground/queer angle, your contact.
+2. Outreach: email individual editors at iHeartBerlin, tip Berlin, Mit Vergnügen, Exberliner
+   and especially **SIEGESSÄULE** (queer core). Personal, short, "thought this fits your
+   readers." Each write-up = traffic + a backlink (helps SEO/GEO).
+
+**Institutions & universities**
+1. Setup: shortlist 2–3 aligned bodies (Clubcommission Berlin, a uni **AStA**, a queer/ND
+   org). Prepare a one-paragraph intro + the app link.
+2. Outreach: offer *them* value first — "a curated feed/widget for your students/members" —
+   then ask for a newsletter mention or a notice-board flyer. Follow up once.
+
+**Offline / stickers & QR**
+1. Setup: design one A6 sticker/flyer with a bold line ("What's on in Berlin tonight →") and
+   a **QR code** pointing at the app (with `?utm_source=sticker`). Order cheaply online.
+2. Recurring: place them where allowed — partner venues, cafés, Spätis, coworking, uni
+   boards. Refresh monthly.
+
+**Micro-influencers / creators**
+1. Setup: list 5–10 Berlin nightlife/queer/expat creators.
+2. Outreach: offer **access, not cash** first (early "just added" tips, guestlist help). Ask
+   for an honest mention/story. Track who drives visits via a unique UTM link per creator.
+
+**Venue widget embed (B2B cross-promo)**
+1. Setup: offer a partner venue a small embeddable "upcoming here" widget (their events, your
+   branding + link).
+2. Result: reach on their site + a backlink + a natural lead-in to a §16 partnership.
+
+**Paid ads** (only after organic retention exists — needs Impressum live)
+1. Setup: Meta Ads Manager; install basic tracking; ensure the Impressum + privacy pages are
+   live (required).
+2. Test: **€5–10/day** boosting your best-performing organic Reel; geo-target Berlin +
+   interests; kill losers fast, scale winners; retarget site visitors + build lookalikes.
