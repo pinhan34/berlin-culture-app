@@ -20,7 +20,7 @@ Turns our own data into the marketing content that drives traffic. See DISTRIBUT
 | Item | Status | Effort | Notes |
 | --- | --- | --- | --- |
 | **"This weekend in Berlin" share generator** | ✅ | — | `/api/share` (next/og image) + `/share` owner tool: range/format picker, preview, download, per-channel UTM caption. |
-| **Newsletter capture** | ⬜ | ~2–3 hrs | Signup box component + `/api/subscribe` route storing emails in a Supabase table. The "owned audience" funnel the share posts feed into. |
+| **Newsletter capture** | ✅ | — | `NewsletterSignup` on the homepage + `/api/subscribe` route → `subscribers` table (migration `003`, RLS-locked, service-role writes). Captures `utm_source`. Sending the digest itself is still manual/external (see below). |
 | **UTM landing capture** | 🟡 | ~1 hr | Links now *carry* UTMs (share generator). Still to do: read `?utm_source=…` on landing and record it (into `interactions` or a log) to measure which channel delivers. |
 
 ## B. Monetization code (groundwork — build before joining networks)

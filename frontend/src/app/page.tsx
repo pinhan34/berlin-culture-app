@@ -3,6 +3,7 @@ import { EventFeed } from '@/components/EventFeed';
 import { VenueStrip } from '@/components/VenueStrip';
 import { HowItWorks } from '@/components/HowItWorks';
 import { ClickStats } from '@/components/ClickStats';
+import { NewsletterSignup } from '@/components/NewsletterSignup';
 import type { Event, Venue } from '@/lib/types';
 import { SITE_URL, SITE_NAME } from '@/lib/site';
 
@@ -119,6 +120,10 @@ export default async function Home() {
       <VenueStrip venues={venues} />
 
       <EventFeed events={events} venues={venues} />
+
+      <div className="mt-12">
+        <NewsletterSignup />
+      </div>
     </div>
   );
 }
