@@ -6,8 +6,36 @@
 
 ---
 
+## 0. Bottom line up front — is affiliate a realistic monetization *gate*?
+
+**Short answer: no.** For this app, affiliate ticketing is a *passive baseline*, not a
+business model. Three structural reasons:
+
+1. **Much of our best content can't be affiliated at all** — underground/queer/community
+   events are often **free, donation, or door-pay** (no online checkout to earn on), or
+   they link to **RA / DICE / Telegram**, which have **no public affiliate program**.
+2. **The platforms that *do* pay (Eventim, Ticketmaster, Eventbrite) are the mainstream
+   events** — exactly what this app is *least* about.
+3. **It's a volume game.** Commission is a few % of a ~€15–25 ticket, at ~2–5% conversion.
+   At realistic early traffic that's **single-digit to low-tens of € / month** (see §6).
+
+**So treat affiliate as "switch it on once, take whatever trickles in" — never plan around it.**
+The real money for a niche curator is **Premium (#22) + promoted placement (#21) + a handful
+of direct venue/promoter partnerships** (§14–§16), with the experiences layer as an easy
+complementary side-stream (§15).
+
+**Why we still log the outbound `domain` (interactions table):** the data is valuable even
+if affiliate is weak — it (a) *proves whether affiliate is even worth the paperwork* ("do
+people actually click Eventim/Eventbrite, or overwhelmingly RA?" — measure before you
+monetize), and (b) becomes the **evidence for direct-partnership pitches** ("we sent your
+venue N clicks last month"). It earns its place regardless of whether a single affiliate
+link is ever turned on.
+
+---
+
 ## Table of contents
 
+0. [Bottom line up front — is affiliate a realistic gate?](#0-bottom-line-up-front--is-affiliate-a-realistic-monetization-gate)
 1. [Affiliate ticketing — how it works](#1-affiliate-ticketing--how-it-works)
 2. [Coverage reality for this app](#2-coverage-reality-for-this-app)
 3. [The programs in detail](#3-the-programs-in-detail-verified-2026)
@@ -19,6 +47,8 @@
 9. [AI agents & ChatGPT](#9-ai-agents--chatgpt)
 10. [Phase assessment & current status](#10-phase-assessment--current-status)
 11. [Recommended budget-aware sequence](#11-recommended-budget-aware-sequence)
+17. [Launch readiness — what's left to go live](#17-launch-readiness--whats-left-to-actually-go-live)
+18. [Full distribution channel catalog (Berlin-specific)](#18-full-distribution-channel-catalog-berlin-specific)
 
 ---
 
@@ -141,6 +171,14 @@ Example: 5,000 monthly visitors → 30% tap an event = 1,500 outbound clicks. If
 Our unfair advantage: **the app *is* a content factory** — daily ranked, vibe-tagged, fresh "what's on in Berlin." Most startups must invent content; we generate it.
 
 ### Instagram (primary channel)
+
+> **Clarification — publishing ≠ scraping.** This is about **posting *to* our own
+> Instagram account** as marketing (output), *not* scraping events *from* Instagram
+> (input, which is login-gated and we don't do). We currently have **no Instagram
+> presence of either kind** — both a marketing account and the auto-post generator
+> below still need to be created. The "this weekend" engine just turns rows from our
+> own database into a ready-to-post image + caption; no scraping involved.
+
 **Organic (free, first):**
 - **"This weekend in Berlin" Reel** — 15–30s vertical, 3–5 events, trending audio, posted every Thursday. Highest-ROI format for event accounts.
 - **Carousels** — "7 queer parties this week", "Neurodivergent-friendly events" → maps to **community lanes** & **vibe tags**, auto-generatable from our data.
@@ -323,6 +361,18 @@ The realism star-rating in §14 only measures **"how likely/easy is this to work
 > already carries a `venueId`, and several carry RA club IDs and `website_url`. We don't need
 > to find partners; we already track them.
 
+> **Prerequisite — partnerships need leverage, and leverage = traffic + click data.**
+> Partnerships are the *destination*; distribution is the *road*. Approaching a venue
+> with "0 clicks last month" has no pitch. So the realistic order is:
+> **(1) get the app live & marketed** (distribution + GEO — see §8/§9 and §17) →
+> **(2) let the `interactions` table accumulate clicks-per-venue for a few weeks** (now
+> unblocked — the table exists) → **(3) then** approach the top 3–5 venues with real
+> numbers. The migration is done; the missing piece is step 1 (traffic).
+>
+> **Be monetization-ready in parallel:** of the three mechanisms below, build the
+> **promo code** path first — it's the smallest change and the *only* one that works on
+> Telegram / `event_url = null` events, so onboarding a partner later is instant.
+
 ### Step 1 — Rank targets from data we already have
 Build a simple **partnership scorecard** per venue using existing signals:
 - **Event volume** — count of events per `venue_id` in Supabase (who fills our feed).
@@ -361,3 +411,149 @@ Monthly, report back: clicks sent (our tracking) + sales/redemptions (their prom
 Add a few partners per quarter. Keep it a **handful** (manual, high-touch) until volume justifies a self-serve partner portal — at which point it graduates into the **promoted events (#21)** product.
 
 **Why this is the realistic path for the underground:** it doesn't depend on RA/DICE offering an affiliate program. It rides on relationships, and the scraper already (a) identifies who to approach, (b) supplies the contact channel, and (c) generates the click data that *is* the pitch.
+
+---
+
+## 17. Launch readiness — what's left to actually go live
+
+The product is **built and auto-deploys to Vercel**, so it's technically reachable. But
+it is **not launch-ready to market**. The gaps below (audited Jul 2026) are the real
+bottleneck between "deployed" and "driving traffic." Nothing here is monetization — it's
+the scaffolding that everything in §8–§16 depends on.
+
+### A. Legal / compliance — **blocker, do first** (Germany)
+Do **not** promote the app before these exist; they're legally required for a
+German-facing site and also required for affiliate networks (Awin/Eventim) later.
+- [ ] **Impressum** page (legally mandated identification).
+- [ ] **Privacy policy / Datenschutzerklärung** — now required because Tier 2a collects
+      anonymous engagement signals server-side (must describe the `interactions` data,
+      the anonymous id, and that there's no PII). A short in-app note already exists in
+      `HowItWorks.tsx`, but a full policy page is still missing.
+- [ ] **Cookie / consent** handling (GDPR) — even minimal, since we set `localStorage`
+      ids and log interactions.
+- [ ] **Legal links in the footer** (`layout.tsx` footer currently has none).
+
+### B. Discoverability / GEO — cheap, high-leverage (see §9)
+- [ ] **`robots.txt`** in `frontend/public/` explicitly allowing AI crawlers
+      (`OAI-SearchBot`, `ChatGPT-User`, `PerplexityBot`, `ClaudeBot`, `Googlebot`).
+- [ ] **Event JSON-LD** structured data on event/venue pages (we already hold structured
+      event data — this is what gets us cited by ChatGPT/Perplexity/Google).
+- [ ] Richer **`<meta>` / OpenGraph** tags for link previews (`layout.tsx` metadata is
+      currently just a title + description).
+
+### C. Distribution channel — the actual traffic engine (see §8)
+- [ ] Create the **`@berlinculture` Instagram account** (and/or Telegram/WhatsApp channel).
+- [ ] Build the **"this weekend in Berlin" post generator** — turns DB rows into a
+      ready-to-post image + caption (auto-content from our own data; no scraping).
+- [ ] Establish a **posting cadence** (e.g. Thursday "this weekend" reel + daily
+      "just added" stories).
+
+### D. Nice-to-have
+- [ ] Custom domain.
+- [ ] Basic analytics (privacy-friendly, e.g. Plausible) to watch traffic vs. the
+      internal `interactions` signals.
+
+### Suggested order
+**A (compliance) → B (GEO, ~1–2 hrs, free) → C (distribution) →** *then* accumulate
+click data → *then* §16 partnerships. A is a gate; B is the cheapest win; C is what
+actually creates the audience that makes monetization (and partnership pitches) possible.
+
+---
+
+## 18. Full distribution channel catalog (Berlin-specific)
+
+§8 introduced the big channels; this is the **complete menu** — every realistic medium,
+platform, institution and offline surface, and **how** to use each for *this* app. Grouped
+by type, with cost/effort/fit. **Fit** = how well it reaches our core (locals + the
+indie/queer/neurodivergent scene + expats). Do **not** over-extend — pick **2–3 owned
+channels + 1 community + a rolling offline/PR effort** and do them consistently.
+
+> ⚠️ **Compliance gate:** paid ads, German institutional partners, and most listing sites
+> will require a live **Impressum + privacy policy** (§17-A). Free organic posting can start
+> earlier, but do the legal pages before anything official or paid.
+
+### 18.1 Owned social / content platforms (post *from* our own data)
+| Channel | How to use it | Cost | Effort | Fit |
+|---|---|---|---|---|
+| **Instagram** | "This weekend" Reels (Thu), community carousels ("7 queer parties this week"), daily "just added" Stories, link-in-bio → app. Auto-generate from DB. | Free | Med | ⭐⭐⭐⭐⭐ |
+| **TikTok** | Reuse the same vertical Reels; best Gen-Z event discovery; trend audio + fast cuts. | Free | Low (reuse) | ⭐⭐⭐⭐ |
+| **YouTube Shorts** | Same vertical clips again; also long-tail SEO (searchable "things to do in Berlin"). | Free | Low (reuse) | ⭐⭐⭐ |
+| **Facebook Page + Events** | Cross-post from IG (Meta Business Suite); create FB Events (older/expat crowd still RSVPs here). | Free | Low | ⭐⭐⭐ |
+| **Threads / Bluesky / X** | Short daily "tonight in Berlin" text posts + link. Bluesky has an active Berlin/arts crowd. | Free | Low | ⭐⭐ |
+| **Pinterest** | Boards like "Berlin queer nightlife", "free things in Berlin" — evergreen, strong Google image SEO. | Free | Low | ⭐⭐ |
+
+### 18.2 Owned audiences (algorithm-proof — capture these early)
+| Channel | How to use it | Cost | Effort | Fit |
+|---|---|---|---|---|
+| **Email newsletter** | Weekly "Berlin this week" digest auto-built from the feed. Most durable channel; the **Premium (#22) funnel**. Capture emails from day one. | Free–low | Med | ⭐⭐⭐⭐⭐ |
+| **Telegram channel** | We *scrape* Telegram — also **publish** a "Berlin Tonight" channel. Native to the scene; instant. | Free | Low | ⭐⭐⭐⭐ |
+| **WhatsApp Channel** | Broadcast nightly picks; huge in Germany/EU; one-to-many, no spam. | Free | Low | ⭐⭐⭐ |
+| **Discord community** | A server for regulars (queer/ND channels, "who's going tonight"). Builds retention + word of mouth. | Free | Med | ⭐⭐⭐ |
+
+> **Owned > rented.** Algorithms change overnight; email + Telegram/WhatsApp are yours
+> forever. Every other channel should funnel into these.
+
+### 18.3 Community platforms (participate, don't spam)
+| Channel | How to use it | Cost | Fit |
+|---|---|---|---|
+| **Reddit** — r/berlin, r/askberlin, r/berlinsocialclub, r/germany | Genuinely answer "what's on this weekend?" threads; a weekly picks post if mods allow. Also **~47% of Perplexity citations are Reddit** → feeds GEO (§9). | Free | ⭐⭐⭐⭐ |
+| **Facebook Groups** | Expat, queer, neurodivergent, student, newcomer groups — real participation. A goldmine in Berlin. | Free | ⭐⭐⭐⭐ |
+| **Meetup** | Host/announce our own "Berlin culture" meetups; cross-post community events. | Free–low | ⭐⭐⭐ |
+| **nebenan.de** | German hyperlocal neighbourhood network — post neighbourhood events. | Free | ⭐⭐ |
+| **Toytown Germany** | Long-running Berlin expat forum — event listings + presence. | Free | ⭐⭐ |
+
+### 18.4 Search & AI discovery (pull, not push)
+| Channel | How to use it | Cost | Fit |
+|---|---|---|---|
+| **SEO (Google)** | Rank for "things to do in Berlin this weekend", "queer events Berlin". Needs fast, structured, fresh pages — we have freshness. | Free | ⭐⭐⭐⭐ |
+| **GEO (ChatGPT/Perplexity/Google AI)** | robots.txt allow + Event JSON-LD (§9/§17-B) → get *cited* when people ask AI what's on. Cheapest innovative lever. | Free | ⭐⭐⭐⭐⭐ |
+| **App-store ASO** | Only if we ship a PWA/native wrapper later; rank for Berlin event searches. | Low | ⭐⭐ |
+
+### 18.5 Berlin listing sites & media (get featured → traffic + backlinks + GEO)
+Pitch these for a write-up or "app of the month"; each backlink also boosts SEO/GEO.
+- **iHeartBerlin**, **tip Berlin**, **Mit Vergnügen Berlin**, **Ask Helmut** (event discovery), **Exberliner** (English-language, expat), **The Berliner / Berlin Loves You**, **SIEGESSÄULE** (the queer city magazine — *core-audience bullseye*), **Berlin.de / visitBerlin** editorial.
+- **How:** a short press kit (what the app is, screenshots, founder note, the "curated underground/queer" angle) + a personal email to an editor. Free; pure pitching.
+
+### 18.6 Institutions & organisations (Berlin-specific, high-trust reach)
+These lend credibility and reach whole communities at once. Approach with the same
+data-backed, on-brand pitch as venue partnerships (§16).
+- **Clubcommission Berlin** — the nightlife/club association; newsletter + network of venues. Highly aligned.
+- **Musicboard Berlin / Initiative Musik** — music funding bodies; community channels.
+- **Universities & student bodies** — TU, HU, FU, UdK, Bard, CODE, ESMT: **AStA** (student unions), **International Offices**, **ESN / Erasmus** networks, physical notice boards, student newsletters. Students = high-intent event audience.
+- **Language schools & expat services** — newcomers hunting for what to do; flyers + partnerships.
+- **Queer & community orgs** — Schwules Museum, queer centres, FLINTA collectives, neurodivergent groups — reach our exact niche lanes.
+- **Tourism layer** — hostels/hotels (lobby QR, concierge cards), visitBerlin partner listings — pairs naturally with the experiences layer (§15).
+- **How:** short intro email + one-pager; offer them value (a curated feed/widget for *their* audience) before asking for reach.
+
+### 18.7 Offline / guerrilla (Berlin rewards physical presence)
+| Surface | How | Cost |
+|---|---|---|
+| **Stickers & flyers** | QR-code stickers in Spätis, cafés, venue toilets, U-Bahn, Kreuzberg/Neukölln lamp posts. Cheap, on-brand, very Berlin. | Low |
+| **Posters** | A5/A3 at partner venues, coworking spaces, unis. | Low–med |
+| **QR at events** | A small card/sticker at partner venues' door: "scan for what's on next". Turns venue traffic into app users. | Low |
+| **Merch / tote bags** | Berlin loves a good tote; walking advertising. | Med |
+
+### 18.8 Creators, press & cross-promotion
+- **Micro-influencers** — Berlin nightlife/queer/expat creators; pay in *access* (guestlist, first-to-know) not cash at first.
+- **Podcasts / local YouTubers** — "Berlin life" / expat channels; offer to be the "what's on" segment.
+- **Newsletter swaps** — cross-promote with other Berlin newsletters (non-competing).
+- **Widget embed / B2B** — let venues embed our "upcoming here" widget on *their* site (their content, our branding + link) — reach + backlinks + partnership seed.
+
+### 18.9 Paid amplification (only after retention is proven — see §11)
+| Channel | Use | Notes |
+|---|---|---|
+| **Meta Ads (IG/FB)** | Reels/Stories via Advantage+; geo-target Berlin + interests; retargeting + lookalikes. | Start €5–10/day; **requires Impressum**. |
+| **TikTok Ads** | Spark Ads boosting organic winners. | Low entry. |
+| **Reddit Ads** | Target r/berlin + interests. | Cheap, niche. |
+| **Google Ads** | Only for high-intent search terms; usually SEO/GEO is better value. | Watch CPC. |
+
+### How to choose (don't do everything)
+1. **Owned core (pick 2–3):** Instagram + Email + Telegram — start here, post consistently.
+2. **One community channel:** Reddit *or* Facebook Groups — wherever your niche already hangs out.
+3. **Always-on & free:** GEO (§9) + rolling PR pitches to §18.5 (esp. **SIEGESSÄULE** for the queer core) + guerrilla stickers.
+4. **Institutions:** approach 1–2 aligned ones (Clubcommission, a uni AStA) once you have something to show.
+5. **Paid:** last, small, only after organic retention exists.
+
+> The pattern: **many free channels feed the owned ones (email/Telegram); the owned
+> audience → traffic → click data → partnerships (§16) & Premium (§22).** Distribution and
+> monetization are the same flywheel.
