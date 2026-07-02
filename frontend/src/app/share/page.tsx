@@ -3,10 +3,14 @@ import { SITE_URL } from '@/lib/site';
 import { fetchEventsInRange } from '@/lib/eventsServer';
 import {
   buildShareCaption,
+  buildShareLink,
   getShareRange,
+  isShareChannelKey,
   isShareRangeKey,
+  SHARE_CHANNELS,
   SHARE_RANGE_KEYS,
   toShareEvents,
+  type ShareChannelKey,
   type ShareRangeKey,
 } from '@/lib/shareContent';
 import { CopyButton } from '@/components/CopyButton';
@@ -42,7 +46,10 @@ function pill(active: boolean): string {
   }`;
 }
 
-type SP = { range?: string; format?: string };
+type SP = { range?: string; format?: string; channel?: string };
+
+// Channels where captions can't carry a clickable link → point to bio instead.
+const BIO_LINK_CHANNELS = new Set<ShareChannelKey>(['instagram', 'tiktok']);
 
 export default async function SharePage({
   searchParams,
@@ -54,6 +61,7 @@ export default async function SharePage({
   const rangeKey: ShareRangeKey = isShareRangeKey(sp.range) ? sp.range : 'weekend';
   const format = FORMATS.find(f => f.key === sp.format)?.key ?? 'post';
   const ratio = FORMATS.find(f => f.key === format)?.ratio ?? '4 / 5';
+  const channel: ShareChannelKey = isShareChannelKey(sp.channel) ? sp.channel : 'instagram';
 
   const range = getShareRange(rangeKey);
   const events = await fetchEventsInRange(
@@ -63,13 +71,16 @@ export default async function SharePage({
   );
   const shareEvents = toShareEvents(events);
 
-  const link = `${SITE_URL}/?utm_source=instagram&utm_medium=social&utm_campaign=${rangeKey}`;
-  const caption = buildShareCaption(shareEvents, range, link);
+  const link = buildShareLink(SITE_URL, channel, rangeKey);
+  const caption = buildShareCaption(shareEvents, range, link, {
+    linkInBio: BIO_LINK_CHANNELS.has(channel),
+  });
 
   const imgSrc = `/api/share?range=${rangeKey}&format=${format}`;
 
   const buildHref = (next: Partial<SP>) =>
-    `/share?range=${next.range ?? rangeKey}&format=${next.format ?? format}`;
+    `/share?range=${next.range ?? rangeKey}&format=${next.format ?? format}` +
+    `&channel=${next.channel ?? channel}`;
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
@@ -103,6 +114,20 @@ export default async function SharePage({
             </a>
           ))}
         </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="mr-1 text-xs font-bold uppercase tracking-wider text-stone-400">
+            Channel
+          </span>
+          {SHARE_CHANNELS.map(c => (
+            <a key={c.key} href={buildHref({ channel: c.key })} className={pill(c.key === channel)}>
+              {c.label}
+            </a>
+          ))}
+        </div>
+        <p className="text-xs text-stone-400 dark:text-stone-500">
+          Link ({channel}):{' '}
+          <span className="break-all font-mono text-stone-500 dark:text-stone-400">{link}</span>
+        </p>
       </div>
 
       {/* Preview + caption */}

@@ -190,6 +190,57 @@ export function toShareEvents(events: Event[]): ShareEvent[] {
 }
 
 // ---------------------------------------------------------------------------
+// Channels & UTM links
+// ---------------------------------------------------------------------------
+
+export type ShareChannelKey =
+  | 'instagram'
+  | 'tiktok'
+  | 'facebook'
+  | 'telegram'
+  | 'whatsapp'
+  | 'reddit'
+  | 'newsletter'
+  | 'sticker';
+
+/** Display label + UTM medium for each channel we post to. */
+export const SHARE_CHANNELS: { key: ShareChannelKey; label: string; medium: string }[] = [
+  { key: 'instagram', label: 'Instagram', medium: 'social' },
+  { key: 'tiktok', label: 'TikTok', medium: 'social' },
+  { key: 'facebook', label: 'Facebook', medium: 'social' },
+  { key: 'telegram', label: 'Telegram', medium: 'messaging' },
+  { key: 'whatsapp', label: 'WhatsApp', medium: 'messaging' },
+  { key: 'reddit', label: 'Reddit', medium: 'social' },
+  { key: 'newsletter', label: 'Newsletter', medium: 'email' },
+  { key: 'sticker', label: 'Sticker / QR', medium: 'offline' },
+];
+
+const CHANNEL_MEDIUM = new Map(SHARE_CHANNELS.map(c => [c.key, c.medium]));
+
+export function isShareChannelKey(v: string | null | undefined): v is ShareChannelKey {
+  return !!v && CHANNEL_MEDIUM.has(v as ShareChannelKey);
+}
+
+/**
+ * Build a UTM-tagged destination link so analytics attribute the visit to the
+ * right channel. `campaign` is typically the range key (weekend/today/...).
+ */
+export function buildShareLink(
+  baseUrl: string,
+  channel: ShareChannelKey,
+  campaign: string,
+): string {
+  const medium = CHANNEL_MEDIUM.get(channel) ?? 'referral';
+  const params = new URLSearchParams({
+    utm_source: channel,
+    utm_medium: medium,
+    utm_campaign: campaign,
+  });
+  const base = baseUrl.replace(/\/$/, '');
+  return `${base}/?${params.toString()}`;
+}
+
+// ---------------------------------------------------------------------------
 // Caption
 // ---------------------------------------------------------------------------
 
@@ -211,6 +262,7 @@ export function buildShareCaption(
   events: ShareEvent[],
   range: ShareRange,
   link: string,
+  opts: { linkInBio?: boolean } = {},
 ): string {
   const lines: string[] = [];
   lines.push(`\u2728 What's on in Berlin ${range.label} \u2728`);
@@ -222,8 +274,13 @@ export function buildShareCaption(
   }
 
   lines.push('');
-  lines.push('Full list + one-tap add-to-calendar \u{1F447}');
-  lines.push(link);
+  if (opts.linkInBio) {
+    // Instagram/TikTok captions can't have clickable links — point to the bio.
+    lines.push('Full list + one-tap add-to-calendar \u2192 link in bio \u{1F447}');
+  } else {
+    lines.push('Full list + one-tap add-to-calendar \u{1F447}');
+    lines.push(link);
+  }
   lines.push('');
   lines.push(BASE_HASHTAGS.join(' '));
 
