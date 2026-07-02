@@ -81,18 +81,20 @@ Contact: [your@email.tld]`}
             4. Anonymous usage signals we collect
           </h2>
           <p className="mt-2">
-            When you interact with an event, we record an anonymous event &mdash; the type of
-            action (opening an event link, saving to calendar, favouriting, or hiding), the
-            event and venue involved, the outbound ticket domain, and a timestamp, linked
-            only to the random identifier above. This{' '}
-            <strong>does not identify you</strong> and is used to power features like
-            trending events and better recommendations, and to understand which venues and
-            partners our audience is interested in.
+            <strong>Only if you agree</strong> (via the consent banner shown on your first
+            visit), when you interact with an event we record an anonymous event &mdash; the
+            type of action (opening an event link, saving to calendar, favouriting, or
+            hiding), the event and venue involved, the outbound ticket domain, and a
+            timestamp, linked only to the random identifier above. This{' '}
+            <strong>does not identify you</strong> and is used to power features like trending
+            events and better recommendations, and to understand which venues and partners our
+            audience is interested in.
           </p>
           <p className="mt-2">
-            <strong>Legal basis:</strong> our legitimate interest in operating and improving
-            the service (Art. 6(1)(f) GDPR). [If a consent banner is used, update this
-            section to reflect consent, Art. 6(1)(a) GDPR.]
+            <strong>Legal basis:</strong> your consent (Art. 6(1)(a) GDPR). If you decline, no
+            interaction data is sent to our server; on-device personalisation (section 3) still
+            works. You can change your choice at any time by clearing this site&apos;s browser
+            storage.
           </p>
         </section>
 

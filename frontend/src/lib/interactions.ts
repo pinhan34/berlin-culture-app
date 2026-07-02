@@ -9,6 +9,7 @@
  */
 
 import { getAnonId } from './anonId';
+import { hasAnalyticsConsent } from './consent';
 
 const INTERACTIONS_KEY = 'bca_interactions';
 const MAX_INTERACTIONS = 200;
@@ -95,6 +96,9 @@ export function syncInteraction(
   meta?: InteractionMeta,
 ): void {
   try {
+    // Off-device analytics is opt-in: do nothing until the user grants consent.
+    if (!hasAnalyticsConsent()) return;
+
     const anonId = getAnonId();
     if (!anonId) return;
 

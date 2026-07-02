@@ -483,12 +483,15 @@ is fine without asking; *analytics* is safer if you **ask permission first** via
 Pick one:
 - **(a) Keep as-is** — no banner, legitimate interest. Simpler, slightly more risk.
 - **(b) Add a lightweight consent banner** — "Allow anonymous analytics? Yes/No"; only log
-  interactions on Yes. Safer; a small dedicated build. **← chosen: to be implemented.**
+  interactions on Yes. Safer; a small dedicated build. **← ✅ implemented** (opt-in banner in
+  `components/ConsentBanner.tsx`; `lib/consent.ts` gates the server sync in `interactions.ts`;
+  on-device personalization is unaffected; privacy policy updated to a consent basis).
 
 **3. Two share/trust follow-ups.**
 - **Branded OG image:** when the link is pasted into WhatsApp/IG/Reddit, platforms show a
-  preview card with a picture. There's no image yet, so the card looks bare. A 1200×630
-  branded image fixes this (can be auto-generated — no design work). **← to be implemented.**
+  preview card with a picture. A 1200×630 branded image fixes this. **← ✅ implemented**
+  (auto-generated in `app/opengraph-image.tsx`, reused for Twitter via `app/twitter-image.tsx`;
+  no design asset needed).
 - **Custom domain:** the app currently lives at `berlin-culture-app.vercel.app`, which reads
   as "demo." A real domain (e.g. `berlinculture.app`, ~€10–30/yr) pointed at Vercel improves
   trust + press. This is a purchase + a Vercel settings step (owner action).
