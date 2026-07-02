@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, DM_Sans } from "next/font/google";
 import "./globals.css";
+import { SITE_URL, SITE_NAME, SITE_TAGLINE, SITE_DESCRIPTION } from "@/lib/site";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -19,8 +20,40 @@ const dmSans = DM_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Berlin Culture App",
-  description: "Your queer and indie guide to events, exhibitions, and community happenings across Berlin",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: `${SITE_NAME} \u2014 ${SITE_TAGLINE}`,
+    template: `%s \u00B7 ${SITE_NAME}`,
+  },
+  description: SITE_DESCRIPTION,
+  applicationName: SITE_NAME,
+  keywords: [
+    "Berlin events",
+    "what's on in Berlin",
+    "things to do in Berlin",
+    "Berlin this weekend",
+    "queer events Berlin",
+    "indie Berlin",
+    "neurodivergent Berlin",
+    "Berlin nightlife",
+    "Berlin exhibitions",
+  ],
+  alternates: { canonical: "/" },
+  openGraph: {
+    type: "website",
+    siteName: SITE_NAME,
+    title: `${SITE_NAME} \u2014 ${SITE_TAGLINE}`,
+    description: SITE_DESCRIPTION,
+    url: SITE_URL,
+    locale: "en_GB",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: `${SITE_NAME} \u2014 ${SITE_TAGLINE}`,
+    description: SITE_DESCRIPTION,
+  },
+  // TODO: add a branded share image (opengraph-image.tsx) so pasted links render
+  // a rich preview card — see docs/MONETIZATION_AND_GROWTH.md §19.
 };
 
 export default function RootLayout({
@@ -60,8 +93,21 @@ export default function RootLayout({
           <div className="h-[3px] bg-gradient-to-r from-pink-500 via-fuchsia-500 via-purple-500 via-blue-400 via-teal-400 via-green-400 to-amber-400" />
         </header>
         <main className="flex-1">{children}</main>
-        <footer className="border-t border-stone-200 py-6 text-center text-xs text-stone-400 dark:border-purple-900/50 dark:text-stone-500">
-          From SO36 to Sinema Transtopia &mdash; your Berlin, curated.
+        <footer className="border-t border-stone-200 py-6 dark:border-purple-900/50">
+          <div className="mx-auto flex max-w-6xl flex-col items-center gap-3 px-4 text-center sm:px-6">
+            <p className="text-xs text-stone-400 dark:text-stone-500">
+              From SO36 to Sinema Transtopia &mdash; your Berlin, curated.
+            </p>
+            <nav className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-stone-400 dark:text-stone-500">
+              <a href="/impressum" className="hover:text-fuchsia-600 dark:hover:text-fuchsia-400 transition-colors">
+                Impressum
+              </a>
+              <span aria-hidden="true">&middot;</span>
+              <a href="/privacy" className="hover:text-fuchsia-600 dark:hover:text-fuchsia-400 transition-colors">
+                Privacy
+              </a>
+            </nav>
+          </div>
         </footer>
       </body>
     </html>

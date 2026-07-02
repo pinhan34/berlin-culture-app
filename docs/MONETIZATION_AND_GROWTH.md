@@ -49,6 +49,7 @@ link is ever turned on.
 11. [Recommended budget-aware sequence](#11-recommended-budget-aware-sequence)
 17. [Launch readiness — what's left to go live](#17-launch-readiness--whats-left-to-actually-go-live)
 18. [Full distribution channel catalog (Berlin-specific)](#18-full-distribution-channel-catalog-berlin-specific)
+19. [How distribution actually works in practice (plain mechanics)](#19-how-distribution-actually-works-in-practice-plain-mechanics)
 
 ---
 
@@ -557,3 +558,67 @@ data-backed, on-brand pitch as venue partnerships (§16).
 > The pattern: **many free channels feed the owned ones (email/Telegram); the owned
 > audience → traffic → click data → partnerships (§16) & Premium (§22).** Distribution and
 > monetization are the same flywheel.
+
+---
+
+## 19. How distribution actually works in practice (plain mechanics)
+
+> **Q: "Do I just advertise the URL (`berlin-culture-app.vercel.app`) on these platforms?"**
+> Not exactly. You **don't post the link** — you **post value (content made from the app's
+> data), and the link is the doorway to more of it.** Naked links get ignored/flagged as
+> spam; useful content ("5 queer parties in Berlin this weekend") gets shared, and *then*
+> the link converts. This is **content marketing**, and it's near-free for us because the
+> app *generates* the content (event lists) automatically.
+
+### The funnel — the same loop every consumer app runs
+**Awareness** (someone sees our content on IG / Reddit / Google) → **Click** (taps our
+link) → **Land** (arrives at the app) → **Retain** (we capture them — "Subscribe to
+calendar" / newsletter — so they return without another ad) → **Refer** (they share an
+event → back to Awareness).
+
+> Top of funnel = cheap/free content. Bottom = **owned audience (email/Telegram)** so we
+> stop depending on any algorithm. The URL is just the *destination*; every channel drives
+> to it.
+
+### Worked example — Instagram, end to end
+1. Create the account **`@berlinculture`**.
+2. Every Thursday, post a ~20s **Reel**: a screen-recording/graphic of this weekend's 5
+   events (auto-built from the DB). Caption: *"5 queer parties in Berlin this weekend 🏳️‍🌈
+   full list + one-tap add-to-calendar → link in bio."*
+3. Viewer sees it in the Berlin hashtag/For-You → taps profile → taps **bio link** → lands
+   on the app → uses it → we prompt **"Subscribe to all events"** (already built) → now we
+   own them.
+
+Same motion everywhere, only the format changes: **Reddit** = a genuinely helpful comment;
+**newsletter** = the weekly email; **Späti sticker** = a QR code — all pointing at the same URL.
+
+### Norms & facts to know
+- **Link-in-bio.** Instagram/TikTok captions can't have clickable links; the standard is a
+  single clickable link on the profile (+ Stories "link stickers"). So the bio link = the app.
+- **UTM parameters** — how traffic is *always* attributed. Append
+  `?utm_source=instagram&utm_campaign=weekend` to the link so analytics show which channel
+  actually delivers visitors. Do this per channel from day one.
+- **Open Graph (OG) tags** — when the URL is pasted into WhatsApp/IG/Reddit it should render
+  a preview card (image + title). **Currently missing** (`layout.tsx` has only title +
+  description) → shared links look bare. Fix as part of §17-B.
+- **Custom domain** — a `*.vercel.app` subdomain reads as "demo/unfinished" and hurts trust
+  + press pitches. A real domain (e.g. `berlinculture.app`) is a small cost with a real
+  credibility payoff. (§17-D)
+
+### What you *literally do*, per channel (cheat-sheet)
+| Channel | The concrete action | The link's role |
+|---|---|---|
+| **Instagram/TikTok** | Post Reel/carousel of events; update **bio link** | Bio link → app (+ UTM) |
+| **Reddit / FB Groups** | Answer "what's on?" helpfully; link where relevant | Inline link in a useful comment |
+| **Newsletter** | Weekly digest email built from the feed | Every event links back to app |
+| **Telegram/WhatsApp** | Broadcast nightly picks | Link per post |
+| **Press/listing sites** | Send a press kit; they write about us | Backlink in the article (SEO/GEO too) |
+| **Stickers/posters/QR** | Physical placement in the city | QR → app URL (+ UTM) |
+| **Venue widget embed** | Venue shows our "upcoming here" widget | Widget links back to app |
+
+### Prerequisites that make sharing actually work (do these first)
+1. **OG/preview meta tags** so pasted links look good (§17-B).
+2. **UTM discipline** so you learn which channels work.
+3. **A capture point on the app** (newsletter signup / calendar subscribe — partly built) so
+   traffic converts into an **owned** audience instead of leaking away.
+4. **(Recommended) a custom domain** for trust.

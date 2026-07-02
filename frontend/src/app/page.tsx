@@ -4,8 +4,46 @@ import { VenueStrip } from '@/components/VenueStrip';
 import { HowItWorks } from '@/components/HowItWorks';
 import { ClickStats } from '@/components/ClickStats';
 import type { Event, Venue } from '@/lib/types';
+import { SITE_URL, SITE_NAME } from '@/lib/site';
 
 export const revalidate = 60; // ISR: refresh data every 60 seconds
+
+/**
+ * schema.org Event structured data (GEO/SEO). Helps Google rich results and lets
+ * AI answer engines extract "what's on in Berlin" cleanly. Capped so the payload
+ * stays small. See docs/MONETIZATION_AND_GROWTH.md §9/§17.
+ */
+function buildEventsJsonLd(events: Event[]) {
+  const items = events.slice(0, 60).map((e, i) => ({
+    '@type': 'ListItem',
+    position: i + 1,
+    item: {
+      '@type': 'Event',
+      name: e.title,
+      startDate: e.start_time,
+      url: e.event_url || SITE_URL,
+      eventStatus: 'https://schema.org/EventScheduled',
+      eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
+      location: {
+        '@type': 'Place',
+        name: e.venue?.name || 'Berlin',
+        address: {
+          '@type': 'PostalAddress',
+          addressLocality: 'Berlin',
+          addressCountry: 'DE',
+        },
+      },
+    },
+  }));
+
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: `What's on in Berlin \u2014 ${SITE_NAME}`,
+    numberOfItems: items.length,
+    itemListElement: items,
+  };
+}
 
 async function getData(): Promise<{ events: Event[]; venues: Venue[] }> {
   const supabase = createClient(
@@ -49,6 +87,10 @@ export default async function Home() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(buildEventsJsonLd(events)) }}
+      />
       <div className="mb-8">
         <h2 className="font-heading text-2xl font-bold tracking-tight text-stone-900 dark:text-stone-100">
           What&apos;s happening in Berlin
