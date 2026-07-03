@@ -10,15 +10,16 @@ and what is **planned** across all three tiers.
 | --- | --- | --- |
 | **Tier 1** | Local, free, no-backend taste learning | ✅ **Done** |
 | **Tier 2a** | Server-side interaction collection (Supabase) | ✅ **Done (code)** · ⏳ migration to run |
-| **Tier 2b** | Aggregate features: Trending + collaborative | 🔜 Planned (needs traffic) |
+| **Tier 2b** | Aggregate features: Trending + collaborative | 🟡 **Trending done** · collaborative 🔜 |
 | **Tier 3** | Semantic / ML recommendations (pgvector) | 🔜 Planned |
 
 > Where we are: the local engine learns across **four dimensions** (venue,
 > category, vibe, community), decays with time, takes negative signals, and
 > explains itself. **Tier 2a** now also streams those signals to Supabase
-> (anonymous, no PII), building the server-side data foundation. The remaining
-> unlock (Tier 2b) — Trending + collaborative — is built once there's enough
-> traffic for aggregates to be meaningful.
+> (anonymous, no PII), building the server-side data foundation. **Tier 2b's
+> Trending strip is now shipped** on top of that data; the remaining 2b unlock
+> (collaborative "others also liked") waits until there's enough traffic for
+> aggregates to be meaningful.
 
 ---
 
@@ -135,33 +136,73 @@ so no new env vars are needed. Data collection begins the moment the table exist
 
 ---
 
-## 🔜 Tier 2b — Aggregate features (planned, needs traffic)
+## 🟡 Tier 2b — Aggregate features (Trending done · collaborative planned)
 
-**Goal:** turn the collected data into cross-user value. Deferred until there's
-enough traffic for aggregates to be meaningful (empty otherwise).
+**Goal:** turn the collected data into cross-user value. **Trending is now shipped;**
+collaborative filtering is deferred until there's enough traffic to be meaningful.
 
 ### Checklist
-- [ ] Aggregate read: `GET /api/trending` (most-engaged upcoming events)
-- [ ] "Trending in Berlin" row in the feed
+- [x] Aggregate read: `GET /api/trending` (most-engaged upcoming events)
+- [x] "Trending in Berlin" row on the homepage
 - [ ] Collaborative filtering: co-occurrence ("people who saved X also saved Y")
 - [ ] Optional: `scoreEvent` aggregate-popularity term (global nudges personal)
 
-### Trending (aggregate signal)
-```sql
--- weight recent engagement; surface upcoming events only
-select e.*, sum(
-  case i.action when 'favourite' then 3 when 'calendar' then 2
-                when 'hide' then -2 else 1 end
-) as heat
-from events e
-join interactions i on i.event_id = e.id
-where e.start_time > now()
-  and i.created_at > now() - interval '14 days'
-group by e.id
-order by heat desc
-limit 12;
-```
-(Promote to a materialized view + scheduled refresh if it gets hot.)
+### ✅ Trending (shipped)
+A **"🔥 Trending in Berlin"** strip on the homepage, ranked from the anonymous
+`interactions` data.
+
+**Files:** `lib/trendingServer.ts` (aggregation), `app/api/trending/route.ts`
+(reusable endpoint), `components/TrendingStrip.tsx` (the row), wired in `app/page.tsx`.
+
+**Scoring** — a recent-engagement "heat" score per event (last 14 days):
+
+| Action | Weight |
+| --- | --- |
+| Favourite | +4 |
+| Calendar save | +3 |
+| Click | +1 |
+| Hide ("Not for me") | −3 |
+
+Only events with a **positive** score and still **upcoming** are shown, top 12
+(strip shows up to 8).
+
+**Decisions (in plain terms):**
+- **Why read it on the server, not in the browser?** The raw click/save data is
+  locked down (RLS) so a visitor's browser can't read other people's activity. Only
+  our server, using a privileged key, can total it up. The browser just receives the
+  finished "here are the trending events" list — never the underlying data.
+- **Why total it up in code instead of one big database query?** At today's small
+  traffic it's simplest to pull the recent rows and add up the scores in a few lines
+  of JavaScript. If traffic grows, we'd move this into the database itself (a saved
+  query / "materialized view") for speed — noted as the upgrade path.
+- **Why does the strip sometimes not appear?** It only shows events that have actually
+  been clicked/saved recently. On a brand-new site (or before people consent to
+  anonymous analytics) there's no data yet, so instead of an empty box the whole strip
+  simply hides itself until there's something real to show.
+- **Why is a "hide" counted as strongly negative (−3)?** So an event lots of people
+  dismissed can't accidentally end up in "Trending." Trending should reflect genuine
+  interest, not noise.
+- **Why is it separate from "For you"?** "For you" is about *your* taste; "Trending"
+  is about *the whole crowd*. They answer different questions, so they're deliberately
+  two different rows.
+- **A small honesty note:** Trending is global, so it doesn't hide events *you*
+  personally marked "not for me." That trade-off keeps it simple; we can make it
+  respect your hides later if it's worth it.
+
+> Reference query if we later push aggregation into Postgres (a view/RPC):
+> ```sql
+> select e.*, sum(
+>   case i.action when 'favourite' then 4 when 'calendar' then 3
+>                 when 'hide' then -3 else 1 end
+> ) as heat
+> from events e
+> join interactions i on i.event_id = e.id
+> where e.start_time > now()
+>   and i.created_at > now() - interval '14 days'
+> group by e.id
+> order by heat desc
+> limit 12;
+> ```
 
 ### Collaborative filtering (lightweight first)
 Co-occurrence over favourites/saves: for events the user liked, find other
@@ -264,6 +305,7 @@ ranking **without rearchitecting** — see `docs/MONETIZATION_AND_GROWTH.md`.
 ## Recommended sequence
 1. ✅ **Tier 1** — done.
 2. ✅ **Tier 2a** — done (code). Remaining: run the migration + add a privacy notice.
-3. 🔜 **Tier 2b** — build once there's traffic for aggregates to be meaningful.
+3. 🟡 **Tier 2b** — Trending strip shipped; collaborative filtering once there's
+   enough traffic for aggregates to be meaningful.
 4. 🔜 **Tier 3** — once data shows which dimensions matter and there's enough
    signal to make embeddings worthwhile.

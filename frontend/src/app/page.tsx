@@ -4,8 +4,10 @@ import { VenueStrip } from '@/components/VenueStrip';
 import { HowItWorks } from '@/components/HowItWorks';
 import { ClickStats } from '@/components/ClickStats';
 import { NewsletterSignup } from '@/components/NewsletterSignup';
+import { TrendingStrip } from '@/components/TrendingStrip';
 import type { Event, Venue } from '@/lib/types';
 import { SITE_URL, SITE_NAME } from '@/lib/site';
+import { getTrendingScores } from '@/lib/trendingServer';
 
 export const revalidate = 60; // ISR: refresh data every 60 seconds
 
@@ -86,6 +88,15 @@ async function getData(): Promise<{ events: Event[]; venues: Venue[] }> {
 export default async function Home() {
   const { events, venues } = await getData();
 
+  // Trending: rank by crowd engagement, then keep only events still upcoming
+  // (i.e. present in the fetched list). Empty until interaction data accrues.
+  const trendingScores = await getTrendingScores({ limit: 12 });
+  const eventById = new Map(events.map(e => [e.id, e]));
+  const trendingEvents = trendingScores
+    .map(s => eventById.get(s.eventId))
+    .filter((e): e is Event => !!e)
+    .slice(0, 8);
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
       <script
@@ -118,6 +129,8 @@ export default async function Home() {
       <ClickStats />
 
       <VenueStrip venues={venues} />
+
+      <TrendingStrip events={trendingEvents} />
 
       <EventFeed events={events} venues={venues} />
 

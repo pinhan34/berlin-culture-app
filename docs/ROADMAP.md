@@ -38,7 +38,7 @@ Tier 2a (server-side anonymous `interactions`) is done. See PERSONALIZATION.
 
 | Item | Status | Effort | Notes |
 | --- | --- | --- | --- |
-| **Trending strip** | ⬜ | ~half day | `/api/trending` aggregates the `interactions` table (service role) → a "Trending in Berlin" row. First payoff of the Tier 2a data. |
+| **Trending strip** | ✅ | — | `lib/trendingServer.ts` (weighted, service-role aggregation) + `/api/trending` + `TrendingStrip` on the homepage. Hidden until interaction data accrues. |
 | **Collaborative filtering** | ⬜ | larger | "people who liked X…"; later, once volume justifies it. |
 
 ## D. Localization
