@@ -80,7 +80,7 @@ export function getEventCommunities(event: Event): Community[] {
   if (cached) return cached;
 
   const result: Community[] = [];
-  const haystack = `${event.title} ${event.venue?.name ?? ''}`;
+  const haystack = `${event.title} ${event.venue?.name ?? ''} ${event.description ?? ''}`;
 
   if (QUEER_VENUE_IDS.has(event.venue_id) || QUEER_RE.test(haystack)) {
     result.push('queer');

@@ -97,6 +97,8 @@ export class FestsaalKreuzbergAdapter implements WebsiteAdapter {
                           )
                         : item.ticket || this.targetUrl;
 
+                    const subtitle = (item.sub_title || '').replace(/\s+/g, ' ').trim();
+
                     const key = `${title}|${startISO}`;
                     out.set(key, {
                         venue_id: this.venueId,
@@ -104,6 +106,7 @@ export class FestsaalKreuzbergAdapter implements WebsiteAdapter {
                         start_time: startISO,
                         duration: null,
                         event_url: publicUrl,
+                        description: subtitle || null,
                     });
                 }
 

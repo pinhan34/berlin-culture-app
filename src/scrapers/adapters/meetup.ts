@@ -108,6 +108,7 @@ export class MeetUpAdapter implements WebsiteAdapter {
                     endTime: payload.endTime,
                     eventUrl: payload.eventUrl,
                     going: payload.going,
+                    description: typeof payload.description === 'string' ? payload.description : undefined,
                 });
                 return results;
             }
@@ -141,7 +142,7 @@ export class MeetUpAdapter implements WebsiteAdapter {
                 seen.add(key);
                 return true;
             })
-            .map(node => {
+            .map((node): NormalizedEvent => {
                 let duration: string | null = null;
                 if (node.endTime) {
                     const startMs = new Date(node.dateTime).getTime();
@@ -156,12 +157,17 @@ export class MeetUpAdapter implements WebsiteAdapter {
                     }
                 }
 
+                const description = node.description
+                    ? node.description.replace(/\s+/g, ' ').trim().slice(0, 800) || null
+                    : null;
+
                 return {
                     venue_id: this.venueId,
                     title: node.title,
                     start_time: new Date(node.dateTime).toISOString(),
                     duration,
                     event_url: (node.eventUrl as string | null) ?? null,
+                    description,
                 };
             })
             .filter((e): e is NormalizedEvent => !!e.title && !!e.start_time);

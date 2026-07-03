@@ -120,7 +120,7 @@ export function getEventVibes(event: Event): Vibe[] {
   const cached = vibeCache.get(event.id);
   if (cached) return cached;
 
-  const haystack = `${event.title} ${event.venue?.name ?? ''}`;
+  const haystack = `${event.title} ${event.venue?.name ?? ''} ${event.description ?? ''}`;
   const result: Vibe[] = [];
   for (const def of VIBE_DEFS) {
     if (def.pattern.test(haystack)) result.push(def.vibe);

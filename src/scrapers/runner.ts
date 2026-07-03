@@ -106,12 +106,17 @@ async function runOrchestrator() {
 
             console.log(`💾 [${adapter.sourceName}] Attempting bulk insert of ${events.length} records into Supabase...`);
 
-            // 5. Native PostgreSQL upsert deployment using Supabase client
+            // 5. Native PostgreSQL upsert deployment using Supabase client.
+            // ignoreDuplicates: false → on a (venue_id,title,start_time) match we
+            // UPDATE the existing row with freshly scraped fields instead of skipping
+            // it. This backfills newly-added columns (e.g. description) onto events
+            // that already existed, and keeps event_url/duration current. created_at
+            // and id are not in the payload, so they're preserved (New badges stay).
             const { data, error } = await supabase
                 .from('events')
                 .upsert(events, {
                     onConflict: 'venue_id,title,start_time', // Our database deduplication shield
-                    ignoreDuplicates: true                 // If it finds a match, do nothing. Save bandwidth!
+                    ignoreDuplicates: false                  // Merge on conflict so descriptions backfill
                 });
 
             if (error) {

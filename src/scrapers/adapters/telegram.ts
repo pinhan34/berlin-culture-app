@@ -55,6 +55,13 @@ const CASUAL_SIGNALS_RE = /\b(wer kommt|anyone coming|kommt jemand|join us|kommt
 const PERSONAL_MESSAGE_RE = /\b(i have|i'm|i am|i need|ich habe|ich bin|ich suche|ich verkaufe|selling my|give away|giving away|my ticket|mein ticket|looking for .{0,20}ticket|suche .{0,20}ticket|verschenke|habe leider|leider kann ich)\b/i;
 const URL_RE = /https?:\/\/\S+/;
 
+/** Collapse a raw Telegram post into a compact description for classification. */
+function buildDescription(text: string): string | null {
+    const clean = text.replace(/\s+/g, ' ').trim();
+    if (clean.length < 3) return null;
+    return clean.length > 800 ? clean.slice(0, 800) : clean;
+}
+
 interface ParsedDate {
     year: string;
     month: string;
@@ -597,6 +604,10 @@ export class TelegramGroupAdapter implements WebsiteAdapter {
             start_time: startTime,
             duration: null,
             event_url: eventUrl,
+            // Keep the (trimmed) post text: it's the richest signal for
+            // community/vibe classification (full of "queer/drag/FLINTA*/ADHD"
+            // wording that the short title rarely contains).
+            description: buildDescription(text),
         };
     }
 

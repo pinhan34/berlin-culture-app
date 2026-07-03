@@ -15,5 +15,8 @@ export interface Event {
   duration: string | null;
   event_url: string | null;
   created_at: string;
+  // Optional source blurb (Telegram post text, MeetUp/Festsaal description).
+  // Used only for community/vibe classification, never rendered verbatim.
+  description?: string | null;
   venue?: Venue;
 }
