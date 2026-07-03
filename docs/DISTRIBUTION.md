@@ -366,3 +366,62 @@ put the app link in bio, post a Thursday "this weekend" Reel + community carouse
    live (required).
 2. Test: **€5–10/day** boosting your best-performing organic Reel; geo-target Berlin +
    interests; kill losers fast, scale winners; retarget site visitors + build lookalikes.
+
+---
+
+## 19b. ✅ Implemented: UTM landing capture (visit attribution)
+
+We built the piece that **answers "which channel actually sent this visitor?"** —
+closing the loop on the share generator (which now *emits* UTM-tagged links). In plain
+terms: when someone arrives, we note where they came from, so you can compare Instagram
+vs. Telegram vs. Reddit vs. the newsletter instead of guessing.
+
+### How it works (plain terms)
+- Someone taps your Instagram bio link (`?utm_source=instagram`) → we remember
+  "instagram" **on their device immediately**, and — *if they've allowed analytics* —
+  log one "came from instagram" row for your stats.
+- Organic arrivals (e.g. from `reddit.com`) are captured via the **referrer**, even with
+  no UTM tag.
+- **Direct** visits with no source and no referrer are **not** logged — that keeps the
+  data meaningful and the row count small.
+
+### Two layers (why there are two)
+- **First-touch (on-device, no consent needed):** the *first* source a visitor arrived
+  from is remembered in their browser only. It never leaves the device, so it needs no
+  consent — it just lets a later **newsletter signup** be credited to how they originally
+  found us (the signup now uses this).
+- **Visit log (consent-gated):** once the visitor clicks **Allow** on the analytics
+  banner, we send **one row per session** to the server for aggregate channel stats.
+  This respects the same opt-in rule as the rest of our analytics.
+
+### What gets stored (no PII)
+A `visits` row holds: an anonymous id, `utm_source` / `utm_medium` / `utm_campaign`, the
+external `referrer` host, the landing `path`, and a timestamp. No names, no emails — just
+"a visit from channel X landed on page Y at time Z."
+
+### Where it lives (files)
+- `frontend/src/lib/attribution.ts` — first-touch + consent-gated visit logging.
+- `frontend/src/components/VisitTracker.tsx` — mounted in `layout.tsx`; fires on load and
+  **re-fires when consent changes**, so a visitor who accepts *after* landing is still
+  counted that session.
+- `frontend/src/app/api/track-visit/route.ts` — best-effort ingestion (service role).
+- `supabase/migrations/004_visits.sql` — the `visits` table (RLS-locked; **run once** in
+  the Supabase SQL editor).
+
+### Reading the data
+This **collects** attribution; it doesn't yet **display** it. To see channel performance,
+query the table, e.g.:
+```sql
+select utm_source, count(*) as visits
+from public.visits
+where created_at > now() - interval '30 days'
+group by utm_source
+order by visits desc;
+```
+(Or point a privacy-friendly analytics tool at it later; an owner-only in-app "traffic by
+channel" view is a possible follow-up.)
+
+> **Note on first-visit attribution + consent.** Because server logging is opt-in, the
+> very first pageview before the banner is answered isn't logged server-side. The
+> on-device first-touch still captures the source, so signups are attributed correctly
+> even in that gap.

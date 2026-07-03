@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { getFirstTouch } from '@/lib/attribution';
 
 /**
  * Email capture for the weekly "Berlin this week" digest — the owned-audience funnel
@@ -18,7 +19,11 @@ export function NewsletterSignup() {
     setMessage('');
 
     try {
-      const source = new URLSearchParams(window.location.search).get('utm_source') || 'homepage';
+      // Prefer how the visitor originally arrived (first-touch), then the current URL.
+      const source =
+        getFirstTouch()?.source ||
+        new URLSearchParams(window.location.search).get('utm_source') ||
+        'homepage';
       const res = await fetch('/api/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

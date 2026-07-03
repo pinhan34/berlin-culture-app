@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, DM_Sans } from "next/font/google";
 import "./globals.css";
 import { SITE_URL, SITE_NAME, SITE_TAGLINE, SITE_DESCRIPTION } from "@/lib/site";
 import { ConsentBanner } from "@/components/ConsentBanner";
+import { VisitTracker } from "@/components/VisitTracker";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -53,8 +54,6 @@ export const metadata: Metadata = {
     title: `${SITE_NAME} \u2014 ${SITE_TAGLINE}`,
     description: SITE_DESCRIPTION,
   },
-  // TODO: add a branded share image (opengraph-image.tsx) so pasted links render
-  // a rich preview card — see docs/MONETIZATION_AND_GROWTH.md §19.
 };
 
 export default function RootLayout({
@@ -111,6 +110,7 @@ export default function RootLayout({
           </div>
         </footer>
         <ConsentBanner />
+        <VisitTracker />
       </body>
     </html>
   );
