@@ -201,9 +201,8 @@ export function EventFeed({ events, venues }: Props) {
 
   const dateWindow = useMemo(() => getDateWindow(dateRange), [dateRange]);
 
-  // Quality filter + per-venue cap + URL-level dedup — applied before any user filtering.
-  const cappedEvents = useMemo(() => {
-    const countByVenue = new Map<number, number>();
+  // Quality filter + URL-level dedup (NO cap) — the full pool a user can reach.
+  const qualityEvents = useMemo(() => {
     const seenUrls = new Set<string>();
     return events.filter(e => {
       if (!isQualityEvent(e)) return false;
@@ -212,13 +211,29 @@ export function EventFeed({ events, venues }: Props) {
         if (seenUrls.has(e.event_url)) return false;
         seenUrls.add(e.event_url);
       }
+      return true;
+    });
+  }, [events]);
+
+  // Per-venue display cap on top of the quality pool — tames the DEFAULT feed so no
+  // single aggregator (e.g. the QUEER EVENTS Berlin Telegram feed) dominates the page.
+  const cappedEvents = useMemo(() => {
+    const countByVenue = new Map<number, number>();
+    return qualityEvents.filter(e => {
       const cap = VENUE_CAP_OVERRIDES[e.venue_id] ?? VENUE_DISPLAY_CAP;
       const n = countByVenue.get(e.venue_id) ?? 0;
       if (n >= cap) return false;
       countByVenue.set(e.venue_id, n + 1);
       return true;
     });
-  }, [events]);
+  }, [qualityEvents]);
+
+  // Once the user actively filters (community / vibe / venue / favourites), we drop the
+  // cap and filter the full pool — so tapping "Queer Berlin" reveals the WHOLE queer feed,
+  // not a capped slice. The homepage default stays balanced via the cap above.
+  const hasActiveContentFilter =
+    selectedCommunity !== null || selectedVibe !== null || selectedVenues.size > 0 || showFavourites;
+  const baseEvents = hasActiveContentFilter ? qualityEvents : cappedEvents;
 
   // Freshness — which events were scraped recently, and when the data was last refreshed.
   const { newIds, lastUpdated, isFreshData } = useMemo(() => {
@@ -266,16 +281,16 @@ export function EventFeed({ events, venues }: Props) {
   // Precompute vibe tags per event once.
   const vibesByEvent = useMemo(() => {
     const map = new Map<number, Vibe[]>();
-    for (const e of cappedEvents) map.set(e.id, getEventVibes(e));
+    for (const e of qualityEvents) map.set(e.id, getEventVibes(e));
     return map;
-  }, [cappedEvents]);
+  }, [qualityEvents]);
 
   // Precompute community membership per event once.
   const communitiesByEvent = useMemo(() => {
     const map = new Map<number, Community[]>();
-    for (const e of cappedEvents) map.set(e.id, getEventCommunities(e));
+    for (const e of qualityEvents) map.set(e.id, getEventCommunities(e));
     return map;
-  }, [cappedEvents]);
+  }, [qualityEvents]);
 
   // Single source of truth for filtering. `skip` lets us compute each filter
   // dimension's badge count as if that one dimension were not yet applied, so
@@ -301,26 +316,27 @@ export function EventFeed({ events, venues }: Props) {
     [hiddenSet, showFavourites, favouriteSet, selectedVenues, selectedVibe, vibesByEvent, selectedCommunity, communitiesByEvent, dateWindow],
   );
 
-  const filtered = useMemo(() => cappedEvents.filter(e => passes(e)), [cappedEvents, passes]);
+  const filtered = useMemo(() => baseEvents.filter(e => passes(e)), [baseEvents, passes]);
 
-  // Combined-aware badge counts (each excludes only its own dimension).
+  // Combined-aware badge counts (each excludes only its own dimension). Computed over the
+  // uncapped pool so a badge predicts exactly what tapping the filter will show.
   const vibeCounts = useMemo(() => {
     const counts: Partial<Record<Vibe, number>> = {};
-    for (const e of cappedEvents) {
+    for (const e of qualityEvents) {
       if (!passes(e, { vibe: true })) continue;
       for (const v of vibesByEvent.get(e.id) ?? []) counts[v] = (counts[v] ?? 0) + 1;
     }
     return counts;
-  }, [cappedEvents, passes, vibesByEvent]);
+  }, [qualityEvents, passes, vibesByEvent]);
 
   const communityCounts = useMemo(() => {
     const counts: Partial<Record<Community, number>> = {};
-    for (const e of cappedEvents) {
+    for (const e of qualityEvents) {
       if (!passes(e, { community: true })) continue;
       for (const c of communitiesByEvent.get(e.id) ?? []) counts[c] = (counts[c] ?? 0) + 1;
     }
     return counts;
-  }, [cappedEvents, passes, communitiesByEvent]);
+  }, [qualityEvents, passes, communitiesByEvent]);
 
   const isDefaultView = selectedVenues.size === 0 && !showFavourites;
 
