@@ -40,8 +40,8 @@ export const COMMUNITY_DEFS: CommunityDef[] = [
   {
     community: 'neurodivergent',
     emoji: '\u267E\uFE0F',
-    title: 'Neurodivergent-friendly',
-    tagline: 'Low-key, sensory-aware & welcoming',
+    title: 'Neurodivergent',
+    tagline: 'Autistic, ADHD, HSP & sensory-aware',
     bg: 'bg-gradient-to-br from-indigo-50 to-violet-50 dark:from-indigo-950/30 dark:to-violet-950/20',
     text: 'text-indigo-700 dark:text-indigo-300',
     border: 'border-indigo-200 dark:border-indigo-900/50',

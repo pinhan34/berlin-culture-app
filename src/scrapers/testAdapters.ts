@@ -79,7 +79,12 @@ async function main() {
 
     const adapters: Record<string, WebsiteAdapter> = {
         sinema: new SinemaTranstopiaAdapter(),
-        meetup: new MeetUpAdapter(2, ['berlin-neurodivergent-community']),
+        meetup: new MeetUpAdapter(2, [
+            'berlin-neurodivergent-community',
+            'neurodivergent-creative-club',
+            'hsp-berlin',
+            'hochsensibel-hsp-gruppe-fur-anfanger-fortgeschrittene',
+        ]),
         village: new VillageBerlinAdapter(),
         neuro: new NeuroDivergentAdapter(),
         ra: new ResidentAdvisorAdapter([

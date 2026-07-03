@@ -47,8 +47,14 @@ async function runOrchestrator() {
     // 3. Register your active venue adapters here
     const activeAdapters: WebsiteAdapter[] = [
         new SinemaTranstopiaAdapter(),
-        new MeetUpAdapter(4, [
+        // venue_id 2 = "ND Community" (see venueCategories / communities.ts). Must NOT be
+        // 4 — that id is retired and filtered out of every feed, which would hide these.
+        // All groups here feed the Neurodivergent lane (autism/ADHD + HSP/highly-sensitive).
+        new MeetUpAdapter(2, [
             'berlin-neurodivergent-community',
+            'neurodivergent-creative-club',
+            'hsp-berlin',
+            'hochsensibel-hsp-gruppe-fur-anfanger-fortgeschrittene',
         ]),
         new VillageBerlinAdapter(),
         // SO36 (5) and Festsaal Kreuzberg (9) now use dedicated site adapters
