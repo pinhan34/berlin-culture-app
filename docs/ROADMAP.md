@@ -30,9 +30,9 @@ See MONETIZATION §4, §13, §16.
 | Item | Status | Effort | Notes |
 | --- | --- | --- | --- |
 | **#20 Phase 0 — click instrumentation by domain** | ✅ | — | `interactions` logs outbound `domain` + `venue_id`. |
-| **#20 Phase 1 — affiliate link-transform layer** | ⬜ | ~half day | `lib/affiliate.ts` mapping outbound domain → tracking link, applied to the `EventCard` href. Build now, flip real IDs on later. Keep the calendar feed clean. |
+| **#20 Phase 1 — affiliate link-transform layer** | ✅ | — | `lib/affiliate.ts` rewrites outbound domain → tracking link, applied to `EventCard` + `TrendingStrip` hrefs. No-op until env IDs are set; calendar/ICS feed stays clean. Flip real IDs on after joining a network. |
 | **#21 Promoted events** | ⬜ | ~half day | `promoted` flag on events → positive `promotedBoost` in `scoreEvent`, plus a **"Promoted"** label + boost cap. Monetizes even RA/Telegram events. |
-| **Affiliate disclosure note** | ⬜ | ~1 hr | "We may earn a small commission…" — required before any links go live. |
+| **Affiliate disclosure note** | ✅ | — | Footer line shown only when `hasAffiliateConfig()` is true (an affiliate program is configured). |
 
 ## C. Personalization Tier 2b — use the data we now collect
 Tier 2a (server-side anonymous `interactions`) is done. See PERSONALIZATION.

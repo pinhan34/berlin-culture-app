@@ -4,6 +4,7 @@ import "./globals.css";
 import { SITE_URL, SITE_NAME, SITE_TAGLINE, SITE_DESCRIPTION } from "@/lib/site";
 import { ConsentBanner } from "@/components/ConsentBanner";
 import { VisitTracker } from "@/components/VisitTracker";
+import { hasAffiliateConfig } from "@/lib/affiliate";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -98,6 +99,13 @@ export default function RootLayout({
             <p className="text-xs text-stone-400 dark:text-stone-500">
               From SO36 to Sinema Transtopia &mdash; your Berlin, curated.
             </p>
+            {hasAffiliateConfig() && (
+              <p className="max-w-xl text-[11px] text-stone-400 dark:text-stone-500">
+                Some ticket links are affiliate links: if you buy through them we may earn a
+                small commission at no extra cost to you. It helps keep the app free, and we
+                never change prices or reorder events for commission.
+              </p>
+            )}
             <nav className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-stone-400 dark:text-stone-500">
               <a href="/impressum" className="hover:text-fuchsia-600 dark:hover:text-fuchsia-400 transition-colors">
                 Impressum

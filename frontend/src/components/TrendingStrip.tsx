@@ -2,6 +2,7 @@
 
 import type { Event } from '@/lib/types';
 import { extractDomain, trackInteraction } from '@/lib/interactions';
+import { affiliateUrl } from '@/lib/affiliate';
 import { formatWhen } from '@/lib/shareContent';
 import { getVenueDisplayName, isAggregatorVenue, parseTitleVenue } from '@/lib/venueCategories';
 
@@ -63,7 +64,7 @@ export function TrendingStrip({ events }: { events: Event[] }) {
           return e.event_url ? (
             <a
               key={e.id}
-              href={e.event_url}
+              href={affiliateUrl(e.event_url, { clickref: e.id })}
               target="_blank"
               rel="noopener noreferrer"
               onClick={onClick}

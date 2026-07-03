@@ -112,19 +112,38 @@ Before joining anything, measure outbound clicks **by destination domain**.
 - **Missing:** the destination **domain**. Extend tracking to record the host, plus a small local summary view.
 - After ~2 weeks we'll know the traffic split (e.g. "60% RA, 15% Eventbrite, 10% Eventim…") → tells us which programs are worth the paperwork.
 
-### Phase 1 — A link-transform layer
-A config mapping destination domain → affiliate transform:
+### Phase 1 — A link-transform layer ✅ shipped
+Implemented in `frontend/src/lib/affiliate.ts` — `affiliateUrl(url, { clickref })` maps the
+destination domain → affiliate transform, and passes everything else through unchanged:
 
 ```
-ra.co              → (none — pass through unchanged)
-eventbrite.*       → append ?aff=YOURID
-eventim.de         → wrap in Awin deeplink (advertiser 11388 + clickref=eventId)
-ticketmaster.*     → wrap in Impact tracking link
-getyourguide/tiqets→ Awin deeplink
+ra.co / dice.fm / t.me → (none — pass through unchanged)
+eventbrite.*           → append ?aff=<NEXT_PUBLIC_AFF_EVENTBRITE>
+eventim.de             → Awin deeplink (mid 11388 + affid + clickref=eventId)
+getyourguide / tiqets  → Awin deeplink
+ticketmaster.*         → Impact template (NEXT_PUBLIC_IMPACT_TM_TEMPLATE)
 ```
 
-- Applied at click time in `EventCard` (the outbound `href`).
-- The webcal **calendar feed stays clean** (no affiliate links in users' calendars).
+- Applied at click time in **`EventCard`** and **`TrendingStrip`** (the outbound `href`), with
+  `clickref = event.id` for per-event attribution.
+- Click **tracking still records the original destination domain** (`extractDomain(event.event_url)`),
+  so Phase-0 stats stay accurate even after links are rewritten.
+- The webcal/ICS **calendar feed stays clean** (never calls `affiliateUrl`), so affiliate links
+  never end up in users' calendars.
+- **No-op until configured:** with no env IDs set, `affiliateUrl` returns the original URL —
+  safe to ship before joining any network. `hasAffiliateConfig()` gates the disclosure line.
+
+**Env vars to flip it on** (all `NEXT_PUBLIC_*`, since the rewrite happens client-side; affiliate
+IDs are not secret):
+
+| Var | For | Example |
+| --- | --- | --- |
+| `NEXT_PUBLIC_AFF_EVENTBRITE` | Eventbrite `aff` ref | `berlinculture` |
+| `NEXT_PUBLIC_AWIN_AFFID` | your Awin publisher id | `123456` |
+| `NEXT_PUBLIC_AWIN_MID_EVENTIM` | Awin merchant id (default `11388`) | `11388` |
+| `NEXT_PUBLIC_AWIN_MID_GETYOURGUIDE` | Awin merchant id (default `18925`) | `18925` |
+| `NEXT_PUBLIC_AWIN_MID_TIQETS` | Awin merchant id (no default) | — |
+| `NEXT_PUBLIC_IMPACT_TM_TEMPLATE` | Impact link template with `{url}`/`{clickref}` | `https://tm.evyy.net/c/AFF/CMP/URL?u={url}&subId1={clickref}` |
 
 ### Phase 2 — Attribution
 Pass an anonymized `clickref`/`subid` (e.g. event ID + coarse source) so networks report which events convert. No personal data.

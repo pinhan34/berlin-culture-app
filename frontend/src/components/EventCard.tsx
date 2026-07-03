@@ -6,6 +6,7 @@ import { getVenueCategory, CATEGORY_STYLES, getVenueDisplayName, isAggregatorVen
 import { getEventVibes, getVibeDef } from '@/lib/vibes';
 import { downloadICS, buildGoogleCalendarUrl, buildOutlookUrl } from '@/lib/ics';
 import { trackInteraction, extractDomain } from '@/lib/interactions';
+import { affiliateUrl } from '@/lib/affiliate';
 
 const SHORT_DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -198,7 +199,7 @@ export function EventCard({ event, highlight, isNew = false, isFavourited = fals
 
   return hasLink ? (
     <a
-      href={event.event_url!}
+      href={affiliateUrl(event.event_url, { clickref: event.id })}
       target="_blank"
       rel="noopener noreferrer"
       onClick={handleCardClick}
