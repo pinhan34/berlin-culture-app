@@ -22,6 +22,7 @@ Turns our own data into the marketing content that drives traffic. See DISTRIBUT
 | **"This weekend in Berlin" share generator** | ✅ | — | `/api/share` (next/og image) + `/share` owner tool: range/format picker, preview, download, per-channel UTM caption. |
 | **Newsletter capture** | ✅ | — | `NewsletterSignup` on the homepage + `/api/subscribe` route → `subscribers` table (migration `003`, RLS-locked, service-role writes). Captures `utm_source`. Sending the digest itself is still manual/external (see below). |
 | **UTM landing capture** | ✅ | — | `VisitTracker` (in layout) + `lib/attribution.ts` + `/api/track-visit` → `visits` table (migration `004`). First-touch stored on-device (no consent); per-session visit log is consent-gated. Newsletter signup now credits first-touch source. |
+| **Owner "traffic by channel" view** | ✅ | — | `/stats?key=…` (token-gated by `STATS_TOKEN` env, noindex) + `lib/visitsServer.ts`. Aggregate visits by source/referrer/campaign + subscribers by source. No PII. |
 
 ## B. Monetization code (groundwork — build before joining networks)
 See MONETIZATION §4, §13, §16.
