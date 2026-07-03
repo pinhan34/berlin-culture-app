@@ -4,13 +4,25 @@ import type { Event } from './types';
  * Community lanes — the two communities this app is built to serve well.
  * These are first-class discovery entry points, not just filters.
  *
- *   queer          — content-based keyword classification on title/venue
- *   neurodivergent — keyword match on title/venue + the ND Community venue
+ * An event is tagged for a community if EITHER:
+ *   (a) it comes from a source venue dedicated to that community
+ *       (e.g. the QUEER EVENTS Berlin feed, the ND MeetUp group), regardless
+ *       of the individual event's wording, OR
+ *   (b) its title/venue name matches the community's keywords.
+ *
+ * Rule (a) is essential for aggregator feeds: their events have individual
+ * titles like "Messy Salon #1" that never contain the word "queer", so a
+ * keyword-only check would silently drop most of a dedicated queer feed.
  */
 export type Community = 'queer' | 'neurodivergent';
 
-/** MeetUp "berlin-neurodivergent-community" venue. */
-const ND_VENUE_ID = 2;
+/** Source venues whose entire feed belongs to a community. */
+const QUEER_VENUE_IDS = new Set<number>([
+  7, // Telegram: QUEER EVENTS Berlin
+]);
+const ND_VENUE_IDS = new Set<number>([
+  2, // MeetUp: berlin-neurodivergent-community (+ other ND groups)
+]);
 
 const QUEER_RE = /\b(queer|drag|flinta\*?|trans\*?|pride|gay|lesbian|dyke\*?|lgbtq?\+?|gbtq|sapphic|nonbinary|non-binary|enby)\b/i;
 const ND_RE = /\b(neurodivergent|neurodiverse|neurospicy|neuro-?spicy|autis\w*|adhd|au?dhd|asperger\w*|sensory-?friendly)\b/i;
@@ -70,8 +82,10 @@ export function getEventCommunities(event: Event): Community[] {
   const result: Community[] = [];
   const haystack = `${event.title} ${event.venue?.name ?? ''}`;
 
-  if (QUEER_RE.test(haystack)) result.push('queer');
-  if (event.venue_id === ND_VENUE_ID || ND_RE.test(haystack)) {
+  if (QUEER_VENUE_IDS.has(event.venue_id) || QUEER_RE.test(haystack)) {
+    result.push('queer');
+  }
+  if (ND_VENUE_IDS.has(event.venue_id) || ND_RE.test(haystack)) {
     result.push('neurodivergent');
   }
 
