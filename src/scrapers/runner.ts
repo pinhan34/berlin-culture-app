@@ -53,6 +53,7 @@ async function runOrchestrator() {
         new MeetUpAdapter(2, [
             'berlin-neurodivergent-community',
             'neurodivergent-creative-club',
+            'online-body-doubling-coworking',
             'hsp-berlin',
             'hochsensibel-hsp-gruppe-fur-anfanger-fortgeschrittene',
         ]),
