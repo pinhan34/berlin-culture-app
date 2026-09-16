@@ -1,6 +1,7 @@
 import { TelegramClient, Api } from 'telegram';
 import { StringSession } from 'telegram/sessions/index.js';
 import type { WebsiteAdapter, NormalizedEvent } from '../interfaces.js';
+import { normalizeVenueKey, slugify } from '../venueKey.js';
 
 const MONTHS: Record<string, string> = {
     // English
@@ -491,7 +492,7 @@ export class TelegramGroupAdapter implements WebsiteAdapter {
                 const text = msg.message ?? '';
                 if (text.length < 10) continue;
 
-                const event = this.extractEvent(text, groupName);
+                const event = this.extractEvent(text, `telegram:${slugify(groupName)}`);
                 if (!event) continue;
 
                 const key = `${event.title}|${event.start_time}`;
@@ -513,6 +514,7 @@ export class TelegramGroupAdapter implements WebsiteAdapter {
         const enriched = (await Promise.all(
             results.map(async (e): Promise<NormalizedEvent | null> => {
                 let finalTitle = e.title;
+                let venueName = e.venue_name ?? null;
 
                 // Link-less events without a detectable venue were already dropped
                 // in extractEvent, so anything here with no URL already has a venue.
@@ -521,9 +523,8 @@ export class TelegramGroupAdapter implements WebsiteAdapter {
                     if (!isBlockedUrl) {
                         const meta = await fetchEventMeta(e.event_url);
                         if (meta.title) {
-                            finalTitle = meta.venue
-                                ? `${meta.title} @ ${meta.venue}`
-                                : meta.title;
+                            finalTitle = meta.title;
+                            if (meta.venue) venueName = meta.venue;
                         }
                     }
                 }
@@ -535,7 +536,12 @@ export class TelegramGroupAdapter implements WebsiteAdapter {
                     return null;
                 }
 
-                return { ...e, title: finalTitle };
+                return {
+                    ...e,
+                    title: finalTitle,
+                    venue_name: venueName,
+                    venue_key: venueName ? normalizeVenueKey(venueName) : null,
+                };
             })
         )).filter((e): e is NormalizedEvent => e !== null);
 
@@ -543,7 +549,7 @@ export class TelegramGroupAdapter implements WebsiteAdapter {
         return enriched;
     }
 
-    private extractEvent(text: string, groupName: string): NormalizedEvent | null {
+    private extractEvent(text: string, source: string): NormalizedEvent | null {
         const date = this.parseDate(text);
         if (!date) return null;
 
@@ -586,21 +592,15 @@ export class TelegramGroupAdapter implements WebsiteAdapter {
 
         // For link-less events we need a venue to give the card context.
         // If we can't find one in the text, drop the event entirely.
-        let finalTitle = title;
+        let venueName: string | null = null;
         if (!eventUrl) {
-            const venue = extractVenueFromText(text);
-            if (!venue) return null; // no link and no detectable venue → not enough context
-            // Only append the venue if the title doesn't already contain it
-            // (titles are often "Series #1–Café Cralle", where the venue is
-            // already part of the name — appending would read redundantly).
-            if (!title.toLowerCase().includes(venue.toLowerCase())) {
-                finalTitle = `${title} @ ${venue}`;
-            }
+            venueName = extractVenueFromText(text);
+            if (!venueName) return null; // no link and no detectable venue → not enough context
         }
 
         return {
             venue_id: this.venueId,
-            title: finalTitle,
+            title,
             start_time: startTime,
             duration: null,
             event_url: eventUrl,
@@ -608,6 +608,9 @@ export class TelegramGroupAdapter implements WebsiteAdapter {
             // community/vibe classification (full of "queer/drag/FLINTA*/ADHD"
             // wording that the short title rarely contains).
             description: buildDescription(text),
+            source,
+            venue_name: venueName,
+            venue_key: venueName ? normalizeVenueKey(venueName) : null,
         };
     }
 

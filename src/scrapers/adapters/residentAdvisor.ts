@@ -1,4 +1,5 @@
 import type { WebsiteAdapter, NormalizedEvent } from '../interfaces.js';
+import { normalizeVenueKey } from '../venueKey.js';
 
 interface RAVenueConfig {
     clubId: string;
@@ -143,6 +144,9 @@ export class ResidentAdvisorAdapter implements WebsiteAdapter {
                     start_time: new Date(startTime).toISOString(),
                     duration,
                     event_url: eventUrl as string | null,
+                    source: `resident-advisor:${venue.clubId}`,
+                    venue_name: venue.name,
+                    venue_key: normalizeVenueKey(venue.name),
                 };
             })
             .filter((e): e is NormalizedEvent => e !== null && !!e.title && !!e.start_time);

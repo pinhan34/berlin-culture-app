@@ -1,4 +1,8 @@
 import type { WebsiteAdapter, NormalizedEvent } from '../interfaces.js';
+import { normalizeVenueKey } from '../venueKey.js';
+
+const SOURCE = 'festsaal-kreuzberg';
+const VENUE_NAME = 'Festsaal Kreuzberg';
 
 /**
  * Festsaal Kreuzberg — dedicated site adapter.
@@ -107,6 +111,9 @@ export class FestsaalKreuzbergAdapter implements WebsiteAdapter {
                         duration: null,
                         event_url: publicUrl,
                         description: subtitle || null,
+                        source: SOURCE,
+                        venue_name: VENUE_NAME,
+                        venue_key: normalizeVenueKey(VENUE_NAME),
                     });
                 }
 

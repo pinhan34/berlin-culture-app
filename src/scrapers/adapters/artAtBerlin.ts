@@ -1,5 +1,8 @@
 import { chromium } from 'playwright';
 import type { WebsiteAdapter, NormalizedEvent } from '../interfaces.js';
+import { normalizeVenueKey } from '../venueKey.js';
+
+const SOURCE = 'art-at-berlin';
 
 export class ArtAtBerlinAdapter implements WebsiteAdapter {
     sourceName = 'ART at Berlin';
@@ -62,10 +65,10 @@ export class ArtAtBerlinAdapter implements WebsiteAdapter {
                     }
 
                     let title: string;
+                    let gallery: string | null = null;
                     if (segments.length >= 3) {
-                        const artistExhibition = segments.slice(0, -1).join(': ');
-                        const gallery = segments[segments.length - 1] ?? '';
-                        title = `${artistExhibition} @ ${gallery}`;
+                        title = segments.slice(0, -1).join(': ');
+                        gallery = segments[segments.length - 1] ?? null;
                     } else if (segments.length === 2) {
                         title = segments.join(': ');
                     } else if (segments.length === 1) {
@@ -112,6 +115,7 @@ export class ArtAtBerlinAdapter implements WebsiteAdapter {
                             start_time: iso,
                             duration,
                             event_url: eventUrl,
+                            galleryName: gallery,
                         });
                     } catch {
                         // skip invalid dates
@@ -121,9 +125,18 @@ export class ArtAtBerlinAdapter implements WebsiteAdapter {
                 return batch;
             }, this.venueId);
 
-            const filtered = events.filter(
-                (e): e is NormalizedEvent => !!e.title && !!e.start_time && !!e.venue_id
-            );
+            const filtered = events
+                .filter((e: any): e is NormalizedEvent & { galleryName: string | null } =>
+                    !!e.title && !!e.start_time && !!e.venue_id)
+                .map((e: NormalizedEvent & { galleryName: string | null }): NormalizedEvent => {
+                    const { galleryName, ...rest } = e;
+                    return {
+                        ...rest,
+                        source: SOURCE,
+                        venue_name: galleryName,
+                        venue_key: galleryName ? normalizeVenueKey(galleryName) : null,
+                    };
+                });
 
             console.log(`[${this.sourceName}] Found ${filtered.length} current exhibitions.`);
             return filtered;

@@ -131,15 +131,27 @@ function groupByDate(events: Event[]): Map<string, Event[]> {
 }
 
 /**
+ * Grouping key for per-venue capping/interleaving. Once an event has a
+ * populated venue_key (Phase 2 — real venue parsed/fetched at scrape time),
+ * bucket on that so events at different real venues inside one aggregator
+ * are diversified individually. Falls back to the raw venue_id (today's
+ * per-source behavior) for any row without one yet.
+ */
+function venueBucketKey(e: Event): string {
+  return e.venue_key ?? `id:${e.venue_id}`;
+}
+
+/**
  * Round-robin across *venues* within a single day so no single high-volume
  * source (Village Berlin, Telegram) dominates the top of the list.
  */
 function interleaveByVenue(dayEvents: Event[]): Event[] {
-  const buckets = new Map<number, Event[]>();
+  const buckets = new Map<string, Event[]>();
   for (const e of dayEvents) {
-    const arr = buckets.get(e.venue_id) ?? [];
+    const key = venueBucketKey(e);
+    const arr = buckets.get(key) ?? [];
     arr.push(e);
-    buckets.set(e.venue_id, arr);
+    buckets.set(key, arr);
   }
   const queues = [...buckets.values()];
   const result: Event[] = [];
@@ -218,12 +230,16 @@ export function EventFeed({ events, venues }: Props) {
   // Per-venue display cap on top of the quality pool — tames the DEFAULT feed so no
   // single aggregator (e.g. the QUEER EVENTS Berlin Telegram feed) dominates the page.
   const cappedEvents = useMemo(() => {
-    const countByVenue = new Map<number, number>();
+    const countByBucket = new Map<string, number>();
     return qualityEvents.filter(e => {
+      // Cap value is still keyed by source (venue_id) — the numbers describe how
+      // much of an aggregator's total volume to allow. The counter itself is keyed
+      // by real venue (see venueBucketKey), so that volume is now spread per-venue.
       const cap = VENUE_CAP_OVERRIDES[e.venue_id] ?? VENUE_DISPLAY_CAP;
-      const n = countByVenue.get(e.venue_id) ?? 0;
+      const key = venueBucketKey(e);
+      const n = countByBucket.get(key) ?? 0;
       if (n >= cap) return false;
-      countByVenue.set(e.venue_id, n + 1);
+      countByBucket.set(key, n + 1);
       return true;
     });
   }, [qualityEvents]);

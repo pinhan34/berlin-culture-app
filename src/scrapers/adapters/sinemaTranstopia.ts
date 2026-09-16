@@ -1,5 +1,9 @@
 import { chromium } from 'playwright';
 import type { WebsiteAdapter, NormalizedEvent } from '../interfaces.js';
+import { normalizeVenueKey } from '../venueKey.js';
+
+const SOURCE = 'sinema-transtopia';
+const VENUE_NAME = 'Sinema Transtopia';
 
 export class SinemaTranstopiaAdapter implements WebsiteAdapter {
     sourceName = 'Sinema Transtopia';
@@ -100,6 +104,9 @@ export class SinemaTranstopiaAdapter implements WebsiteAdapter {
                 start_time: startTime.toISOString(),
                 duration: null,
                 event_url: eventUrl,
+                source: SOURCE,
+                venue_name: VENUE_NAME,
+                venue_key: normalizeVenueKey(VENUE_NAME),
             });
         }
 

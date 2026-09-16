@@ -1,4 +1,8 @@
 import type { WebsiteAdapter, NormalizedEvent } from '../interfaces.js';
+import { normalizeVenueKey } from '../venueKey.js';
+
+const SOURCE = 'so36';
+const VENUE_NAME = 'SO36';
 
 /**
  * SO36 (Kreuzberg) — dedicated site adapter.
@@ -86,6 +90,9 @@ export class So36Adapter implements WebsiteAdapter {
                 start_time: eventDate.toISOString(),
                 duration: null,
                 event_url: `https://www.so36.com${relUrl}`,
+                source: SOURCE,
+                venue_name: VENUE_NAME,
+                venue_key: normalizeVenueKey(VENUE_NAME),
             });
         }
 

@@ -19,6 +19,22 @@ The repo has two independent npm projects that share only a Supabase database:
 Always `cd` into the right project before running its scripts — there's no root workspace linking
 them.
 
+## ⚠️ Critical rules — read before any code change
+
+- **Never mix Supabase keys**: root scraper uses `SUPABASE_SERVICE_ROLE_KEY` (admin, write
+  access). Frontend uses `NEXT_PUBLIC_SUPABASE_ANON_KEY` (read-only, RLS-safe). Never use the
+  service role key in frontend code.
+- **Migrations are applied MANUALLY**: generate the SQL file in `supabase/migrations/`, then
+  stop and tell the user to apply it against Supabase. Never attempt to run migrations
+  automatically.
+- **Phase 2 of the venue model is NOT implemented**: do not add `venue_name`, `venue_key`,
+  `source`, `city`, `lat`, `lng` columns to `events`, and do not change the scraper write path
+  to populate them, unless explicitly asked to start Phase 2. Read `docs/VENUE_MODEL.md` first.
+- **Retired venue id 4** must stay filtered out of every feed query — see `RETIRED_VENUE_IDS`
+  in `frontend/src/lib/eventsServer.ts`. Never reuse id 4 for a new source.
+- **ICS/calendar feeds** must always use the original event URL, never `affiliateUrl()` — see
+  `frontend/src/lib/affiliate.ts`.
+
 ## Commands
 
 ### Scraper (root)

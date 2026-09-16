@@ -1,4 +1,7 @@
 import type { WebsiteAdapter, NormalizedEvent } from '../interfaces.js';
+import { normalizeVenueKey } from '../venueKey.js';
+
+const SOURCE = 'village-berlin';
 
 interface VillageEvent {
     occurrence_id: string;
@@ -56,13 +59,21 @@ export class VillageBerlinAdapter implements WebsiteAdapter {
     private normalize(raw: VillageEvent[]): NormalizedEvent[] {
         return raw
             .filter((e) => e.title && e.event_date && e.permalink)
-            .map((e) => ({
-                venue_id: this.venueId,
-                title: this.decodeHtml(e.title),
-                start_time: new Date(e.event_date).toISOString(),
-                duration: this.extractDuration(e),
-                event_url: e.permalink,
-            }));
+            .map((e) => {
+                // Village's own API exposes the real per-event location, unlike
+                // Telegram/ART at Berlin where the venue has to be parsed out of text.
+                const venueName = e.location ? this.decodeHtml(e.location).trim() : null;
+                return {
+                    venue_id: this.venueId,
+                    title: this.decodeHtml(e.title),
+                    start_time: new Date(e.event_date).toISOString(),
+                    duration: this.extractDuration(e),
+                    event_url: e.permalink,
+                    source: SOURCE,
+                    venue_name: venueName || null,
+                    venue_key: venueName ? normalizeVenueKey(venueName) : null,
+                };
+            });
     }
 
     private extractDuration(e: VillageEvent): string | null {

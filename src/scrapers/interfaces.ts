@@ -10,6 +10,14 @@ export interface NormalizedEvent {
     duration: string | null; // A text representation of time block matching Postgres intervals (e.g., '1 hour 30 mins')
     event_url: string | null; // Direct link to the specific event booking page (null if no external link)
     description?: string | null; // Optional source blurb/post text — used for community & vibe classification, not shown as-is
+
+    // --- Phase 2 venue model (all optional — every adapter keeps compiling untouched) ---
+    source?: string | null;     // Origin identifier, e.g. 'telegram:queer-events-berlin', 'so36'. Distinct from venue_id, which stays the source's DB id.
+    venue_name?: string | null; // Real-world venue the event happens at, when known
+    venue_key?: string | null;  // Normalised venue_name for dedup (see src/scrapers/venueKey.ts)
+    city?: string | null;
+    lat?: number | null;
+    lng?: number | null;
 }
 
 /**

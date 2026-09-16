@@ -140,6 +140,21 @@ Optionally, promote frequently-seen venues into a real `venues`-like table once
 - Capping/diversity operate on `venue_key`.
 - A deduped venue list is available for the strip/filter.
 
+### Rules of Implementation (Phase 2)
+- `venue_id` keeps meaning "source", never repurposed to mean "venue".
+- Do not modify `venueCategories.ts` parsing logic until `venue_name`/`venue_key`
+  exist in the live DB AND are backfilled for existing rows.
+- Migration file is generated, never auto-applied — always run by hand.
+- Backfill only writes rows where `venue_name IS NULL` (idempotent).
+
+### Error Handling / Edge Cases (Phase 2)
+- `venue_key` collision across genuinely different venues → not handled by
+  normalisation alone; needs a manual alias/disambiguation map before promoting
+  to a venues table.
+- Title without a real `@ Venue` separator → `parseTitleVenue`-equivalent must
+  return null, not a garbage guess; backfill script skips (no write), doesn't crash.
+- Rows without `venue_key` after Phase 2 ships → capping/interleaving fall back
+  to `id:${venue_id}` (today's behavior), never throw.
 ---
 
 ## Decision log / open questions

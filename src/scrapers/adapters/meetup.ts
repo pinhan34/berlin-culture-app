@@ -78,11 +78,11 @@ export class MeetUpAdapter implements WebsiteAdapter {
 
         if (capturedNodes.length > 0) {
             console.log(`[${this.sourceName}][${slug}] GraphQL interception captured ${capturedNodes.length} event node(s).`);
-            return this.normalizeGraphQLNodes(capturedNodes);
+            return this.normalizeGraphQLNodes(capturedNodes, slug);
         }
 
         console.log(`[${this.sourceName}][${slug}] GraphQL interception yielded nothing. Falling back to DOM scraping...`);
-        return this.extractEventsFromDOM(page);
+        return this.extractEventsFromDOM(page, slug);
     }
 
     /**
@@ -132,7 +132,7 @@ export class MeetUpAdapter implements WebsiteAdapter {
         return results;
     }
 
-    private normalizeGraphQLNodes(nodes: MeetUpEventNode[]): NormalizedEvent[] {
+    private normalizeGraphQLNodes(nodes: MeetUpEventNode[], slug: string): NormalizedEvent[] {
         const seen = new Set<string>();
 
         return nodes
@@ -168,6 +168,7 @@ export class MeetUpAdapter implements WebsiteAdapter {
                     duration,
                     event_url: (node.eventUrl as string | null) ?? null,
                     description,
+                    source: `meetup:${slug}`,
                 };
             })
             .filter((e): e is NormalizedEvent => !!e.title && !!e.start_time);
@@ -176,7 +177,7 @@ export class MeetUpAdapter implements WebsiteAdapter {
     /**
      * DOM fallback: scrapes event cards directly from the rendered MeetUp events page.
      */
-    private async extractEventsFromDOM(page: Page): Promise<NormalizedEvent[]> {
+    private async extractEventsFromDOM(page: Page, slug: string): Promise<NormalizedEvent[]> {
         const raw = await page.evaluate((venueId: number) => {
             const cards = document.querySelectorAll('[id^="event-card"]');
             const batch: any[] = [];
@@ -204,8 +205,8 @@ export class MeetUpAdapter implements WebsiteAdapter {
             return batch;
         }, this.venueId);
 
-        return raw.filter(
-            (e): e is NormalizedEvent => !!e.title && !!e.start_time && !!e.venue_id
-        );
+        return raw
+            .filter((e: any): e is NormalizedEvent => !!e.title && !!e.start_time && !!e.venue_id)
+            .map((e: NormalizedEvent) => ({ ...e, source: `meetup:${slug}` }));
     }
 }

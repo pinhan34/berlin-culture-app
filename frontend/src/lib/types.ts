@@ -19,4 +19,13 @@ export interface Event {
   // Used only for community/vibe classification, never rendered verbatim.
   description?: string | null;
   venue?: Venue;
+
+  // Phase 2 venue model (see .claude/specs/VENUE_MODEL.md) — optional until the
+  // migration is applied and adapters/backfill have populated existing rows.
+  source?: string | null;
+  venue_name?: string | null;
+  venue_key?: string | null;
+  city?: string | null;
+  lat?: number | null;
+  lng?: number | null;
 }

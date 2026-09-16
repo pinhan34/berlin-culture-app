@@ -1,5 +1,9 @@
 import { chromium, type Page } from 'playwright';
 import type { WebsiteAdapter, NormalizedEvent } from '../interfaces.js';
+import { normalizeVenueKey } from '../venueKey.js';
+
+const SOURCE = 'flutgraben';
+const VENUE_NAME = 'Flutgraben';
 
 export class FlutgrabenAdapter implements WebsiteAdapter {
     sourceName = 'Flutgraben';
@@ -139,8 +143,13 @@ export class FlutgrabenAdapter implements WebsiteAdapter {
             return batch;
         }, this.venueId);
 
-        return raw.filter(
-            (e): e is NormalizedEvent => !!e.title && !!e.start_time && !!e.venue_id
-        );
+        return raw
+            .filter((e): e is NormalizedEvent => !!e.title && !!e.start_time && !!e.venue_id)
+            .map((e) => ({
+                ...e,
+                source: SOURCE,
+                venue_name: VENUE_NAME,
+                venue_key: normalizeVenueKey(VENUE_NAME),
+            }));
     }
 }
