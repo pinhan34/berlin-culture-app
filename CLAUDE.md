@@ -41,8 +41,11 @@ them.
 ```
 npm run scrape              # run the full orchestrator (src/scrapers/runner.ts) — all adapters, sequential
 npm run scrape:telegram     # run only the Telegram adapter (src/scrapers/testAdapters.ts telegram)
+npm test                    # node --loader ts-node/esm src/scrapers/venueKey.test.ts
+npm run format              # prettier --write .
+npm run format:check        # prettier --check .
 ```
-No lint/test/build scripts are defined at root (`npm test` is a stub). Ad-hoc adapter scripts
+No build script is defined at root. Ad-hoc adapter scripts
 (`testRA.mjs`, `testVenueExtract.mjs`, `testTitleClean.mjs`, etc. in `src/scrapers/`) are run
 directly with `node` for one-off debugging of a single adapter.
 
@@ -57,7 +60,9 @@ npm run dev      # next dev
 npm run build    # next build
 npm run start    # next start
 npm run lint     # eslint
-node --test scripts/classifiers.test.mjs   # the one test file (vibe/community classifiers)
+npm test         # node scripts/classifiers.test.mjs && node scripts/venueModel.test.mjs
+npm run format         # prettier --write .
+npm run format:check   # prettier --check .
 ```
 Requires `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` (read-only, RLS-safe) for
 normal pages, plus service-role and other keys for specific server routes (see below).
