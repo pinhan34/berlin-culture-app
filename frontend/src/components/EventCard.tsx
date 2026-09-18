@@ -65,13 +65,13 @@ interface Props {
 
 export function EventCard({ event, highlight, isNew = false, isFavourited = false, onFavouriteToggle, onHide }: Props) {
   const sourceName = getVenueDisplayName(event.venue_id, event.venue?.name ?? `Venue #${event.venue_id}`);
-  // For aggregator sources, surface the real venue parsed from "Name @ Venue".
-  const parsed = isAggregatorVenue(event.venue_id)
-    ? parseTitleVenue(event.title)
-    : { title: event.title, venue: null };
-  const displayTitle = parsed.title;
-  const venueName = parsed.venue ?? sourceName;
-  const viaSource = parsed.venue ? sourceName : null;
+  const legacyParsed = !event.venue_name && isAggregatorVenue(event.venue_id)
+                        ? parseTitleVenue(event.title)
+                        : { title: event.title, venue: null };
+  const displayTitle = legacyParsed.title;
+  const venueName = event.venue_name ?? legacyParsed.venue ?? sourceName;
+  const viaSource = (event.venue_name || legacyParsed.venue) ? sourceName : null;
+
   const category = getVenueCategory(event.venue_id);
   const style = CATEGORY_STYLES[category];
   const urgency = getUrgencyLabel(event.start_time);

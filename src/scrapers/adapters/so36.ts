@@ -56,14 +56,18 @@ export class So36Adapter implements WebsiteAdapter {
         const anchorRe =
             /<a href="(\/produkte\/(\d+)-tickets-[^"]*?am-\d\d-\d\d-\d{4})"[^>]*title="([^"]+)"/g;
 
-        const byId = new Map<string, NormalizedEvent>();
+        // Keyed by title|date (not productId) — the site sometimes lists the same
+        // event under multiple product links (e.g. separate ticket tiers), which
+        // would otherwise produce two rows with the same DB conflict key
+        // (venue_id, title, start_time) in one upsert batch and make Postgres
+        // reject the whole batch ("ON CONFLICT DO UPDATE cannot affect row twice").
+        const byKey = new Map<string, NormalizedEvent>();
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
         let match: RegExpExecArray | null;
         while ((match = anchorRe.exec(html)) !== null) {
             const relUrl = match[1] ?? '';
-            const productId = match[2] ?? '';
             const rawTitle = decodeEntities(match[3] ?? '');
 
             const dateMatch = rawTitle.match(/am (\d\d)\.(\d\d)\.(\d{4})/);
@@ -84,7 +88,7 @@ export class So36Adapter implements WebsiteAdapter {
             if (Number.isNaN(eventDate.getTime())) continue;
             if (eventDate.getTime() < today.getTime()) continue; // skip past events
 
-            byId.set(productId, {
+            byKey.set(`${name}|${startISO}`, {
                 venue_id: this.venueId,
                 title: name,
                 start_time: eventDate.toISOString(),
@@ -96,7 +100,7 @@ export class So36Adapter implements WebsiteAdapter {
             });
         }
 
-        return [...byId.values()];
+        return [...byKey.values()];
     }
 }
 
