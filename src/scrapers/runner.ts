@@ -30,6 +30,30 @@ process.on('unhandledRejection', (reason: unknown) => {
     process.exit(0);
 });
 
+/**
+ * Collapse rows that share the upsert conflict key (venue_id, title, start_time).
+ * Postgres rejects the WHOLE batch with "ON CONFLICT DO UPDATE command cannot affect
+ * row a second time" if two rows in one statement hit the same key — e.g. two Telegram
+ * posts that enrich to the same page title. The first occurrence wins; later duplicates
+ * only fill fields it left empty (so a venue_key/description isn't lost).
+ */
+function dedupeEvents(events: NormalizedEvent[]): NormalizedEvent[] {
+    const byKey = new Map<string, NormalizedEvent>();
+    for (const e of events) {
+        const key = `${e.venue_id}|${e.title}|${e.start_time}`;
+        const existing = byKey.get(key);
+        if (!existing) {
+            byKey.set(key, { ...e });
+            continue;
+        }
+        const target = existing as unknown as Record<string, unknown>;
+        for (const [field, value] of Object.entries(e)) {
+            if (target[field] == null && value != null) target[field] = value;
+        }
+    }
+    return [...byKey.values()];
+}
+
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseSecretKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -97,7 +121,11 @@ async function runOrchestrator() {
             console.log(`─────────────────────────────────────────`);
 
             // Execute the underlying Playwright promise script
-            const events: NormalizedEvent[] = await adapter.scrape();
+            const scraped: NormalizedEvent[] = await adapter.scrape();
+            const events = dedupeEvents(scraped);
+            if (events.length < scraped.length) {
+                console.log(`🧹 [${adapter.sourceName}] Collapsed ${scraped.length - events.length} duplicate row(s) sharing (venue_id, title, start_time).`);
+            }
 
             if (events.length === 0) {
                 console.log(`⚠️ [${adapter.sourceName}] No operational rows captured. Skipping write sequence.`);
