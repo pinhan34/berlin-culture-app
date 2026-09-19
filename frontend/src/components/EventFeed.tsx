@@ -2,7 +2,8 @@
 
 import { useState, useMemo, useEffect, useCallback, type ReactNode } from 'react';
 import type { Event, Venue } from '@/lib/types';
-import { getVenueDisplayName } from '@/lib/venueCategories';
+import type { VenueSummary } from '@/lib/eventsServer';
+import { getVenueDisplayName, isAggregatorVenue } from '@/lib/venueCategories';
 import { useLocalStorage } from '@/lib/useLocalStorage';
 import { getInteractions, syncInteraction, type Interaction } from '@/lib/interactions';
 import { buildTasteProfile, scoreEvent, explainEvent, type TasteHints } from '@/lib/recommendations';
@@ -192,6 +193,7 @@ function isQualityEvent(e: Event): boolean {
 export function EventFeed({ events, venues }: Props) {
   // Persisted filter preferences — survive page reload
   const [venueArray, setVenueArray] = useLocalStorage<number[]>('bca_venues', []);
+  const [venueKeyArray, setVenueKeyArray] = useLocalStorage<string[]>('bca_venue_keys', []);
   const [dateRange, setDateRange] = useLocalStorage<string>('bca_date', 'all');
   const [favouriteIds, setFavouriteIds] = useLocalStorage<number[]>('bca_favourites', []);
   const [selectedVibe, setSelectedVibe] = useLocalStorage<Vibe | null>('bca_vibe', null);
@@ -203,6 +205,7 @@ export function EventFeed({ events, venues }: Props) {
   const [showMore, setShowMore] = useState(false);
 
   const selectedVenues = useMemo(() => new Set(venueArray), [venueArray]);
+  const selectedVenueKeys = useMemo(() => new Set(venueKeyArray), [venueKeyArray]);
   const favouriteSet = useMemo(() => new Set(favouriteIds), [favouriteIds]);
   const hiddenSet = useMemo(() => new Set(hiddenIds), [hiddenIds]);
   const eventById = useMemo(() => {
@@ -248,7 +251,8 @@ export function EventFeed({ events, venues }: Props) {
   // cap and filter the full pool — so tapping "Queer Berlin" reveals the WHOLE queer feed,
   // not a capped slice. The homepage default stays balanced via the cap above.
   const hasActiveContentFilter =
-    selectedCommunity !== null || selectedVibe !== null || selectedVenues.size > 0 || showFavourites;
+    selectedCommunity !== null || selectedVibe !== null || selectedVenues.size > 0 ||
+    selectedVenueKeys.size > 0 || showFavourites;
   const baseEvents = hasActiveContentFilter ? qualityEvents : cappedEvents;
 
   // Freshness — which events were scraped recently, and when the data was last refreshed.
@@ -320,7 +324,12 @@ export function EventFeed({ events, venues }: Props) {
       if (hiddenSet.has(e.id)) return false;
       if (showFavourites) {
         if (!favouriteSet.has(e.id)) return false;
-      } else if (!skip?.venue && selectedVenues.size > 0 && !selectedVenues.has(e.venue_id)) {
+      } else if (
+        !skip?.venue &&
+        (selectedVenues.size > 0 || selectedVenueKeys.size > 0) &&
+        !selectedVenues.has(e.venue_id) &&
+        !(e.venue_key && selectedVenueKeys.has(e.venue_key))
+      ) {
         return false;
       }
       if (!skip?.vibe && selectedVibe && !(vibesByEvent.get(e.id) ?? []).includes(selectedVibe)) return false;
@@ -329,7 +338,7 @@ export function EventFeed({ events, venues }: Props) {
       if (t < dateWindow.start || t > dateWindow.end) return false;
       return true;
     },
-    [hiddenSet, showFavourites, favouriteSet, selectedVenues, selectedVibe, vibesByEvent, selectedCommunity, communitiesByEvent, dateWindow],
+    [hiddenSet, showFavourites, favouriteSet, selectedVenues, selectedVenueKeys, selectedVibe, vibesByEvent, selectedCommunity, communitiesByEvent, dateWindow],
   );
 
   const filtered = useMemo(() => baseEvents.filter(e => passes(e)), [baseEvents, passes]);
@@ -354,7 +363,36 @@ export function EventFeed({ events, venues }: Props) {
     return counts;
   }, [qualityEvents, passes, communitiesByEvent]);
 
-  const isDefaultView = selectedVenues.size === 0 && !showFavourites;
+  const venueCounts = useMemo(() => {
+    const counts: Record<number, number> = {};
+    for (const e of qualityEvents) {
+      if (!passes(e, { venue: true })) continue;
+      counts[e.venue_id] = (counts[e.venue_id] ?? 0) + 1;
+    }
+    return counts;
+  }, [qualityEvents, passes]);
+
+  // Real venues spotted inside aggregator feeds, derived from the same pool as the feed.
+  // Sorted by unfiltered total so pills keep a stable order; `count` is combined-aware.
+  const realVenues = useMemo<VenueSummary[]>(() => {
+    const byKey = new Map<string, { v: VenueSummary; total: number }>();
+    for (const e of qualityEvents) {
+      if (!e.venue_key || !isAggregatorVenue(e.venue_id)) continue;
+      let entry = byKey.get(e.venue_key);
+      if (!entry) {
+        entry = {
+          v: { venue_key: e.venue_key, venue_name: e.venue_name ?? e.venue_key, count: 0 },
+          total: 0,
+        };
+        byKey.set(e.venue_key, entry);
+      }
+      entry.total += 1;
+      if (passes(e, { venue: true })) entry.v.count += 1;
+    }
+    return [...byKey.values()].sort((a, b) => b.total - a.total).map(x => x.v);
+  }, [qualityEvents, passes]);
+
+  const isDefaultView = selectedVenues.size === 0 && selectedVenueKeys.size === 0 && !showFavourites;
 
   // "Just added" strip — most recently scraped events (by created_at), surfaced
   // at the top so new content isn't buried in the chronological list.
@@ -403,6 +441,10 @@ export function EventFeed({ events, venues }: Props) {
     setVenueArray(prev => prev.includes(id) ? prev.filter(v => v !== id) : [...prev, id]);
   }
 
+  function toggleVenueKey(key: string) {
+    setVenueKeyArray(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
+  }
+
   function handleFavouriteToggle(eventId: number) {
     const adding = !favouriteSet.has(eventId);
     setFavouriteIds(prev =>
@@ -434,6 +476,7 @@ export function EventFeed({ events, venues }: Props) {
 
   function clearAllFilters() {
     setVenueArray([]);
+    setVenueKeyArray([]);
     setSelectedVibe(null);
     setSelectedCommunity(null);
     setDateRange('all');
@@ -475,6 +518,14 @@ export function EventFeed({ events, venues }: Props) {
       onRemove: () => toggleVenue(id),
     });
   }
+  for (const key of venueKeyArray) {
+    activeChips.push({
+      id: `venue-key-${key}`,
+      label: realVenues.find(v => v.venue_key === key)?.venue_name ?? key,
+      emoji: '\u{1F4CD}',
+      onRemove: () => toggleVenueKey(key),
+    });
+  }
 
   return (
     <div className="space-y-8">
@@ -501,7 +552,11 @@ export function EventFeed({ events, venues }: Props) {
             venues={venues}
             selected={selectedVenues}
             onToggle={toggleVenue}
-            onClear={() => setVenueArray([])}
+            counts={venueCounts}
+            realVenues={realVenues}
+            selectedKeys={selectedVenueKeys}
+            onToggleKey={toggleVenueKey}
+            onClear={() => { setVenueArray([]); setVenueKeyArray([]); }}
           />
         </FilterSection>
 

@@ -137,6 +137,12 @@ Plain numbered SQL migration files (`001_align_schema.sql` → `005_event_descri
 migration tool/CLI wired up — apply them manually against the Supabase project in order. Key
 tables: `events`, `venues`, `interactions`, `subscribers`, `visits`.
 
+## Change visibility
+- When editing existing files, make targeted edits (e.g. via a diff/patch-style edit) rather than rewriting the whole file — I want to see a red/green diff of exactly what changed, not a full file replacement.
+- Keep each edit scoped to the specific lines needed for the task. Don't reformat, reorganize, or "clean up" surrounding code as a side effect — unrelated changes make the diff noisy and hide the actual fix.
+- If a change genuinely requires touching many scattered lines, explain why before doing it, so I'm not surprised by a large diff.
+- After any edit, briefly summarize what changed and why, so I can follow the reasoning alongside the diff.
+
 ### Docs (`docs/`)
 Product/strategy docs, not API references — read before large feature work in that area:
 `ROADMAP.md` (status of planned work, what's next and why), `VENUE_MODEL.md` (source-vs-venue

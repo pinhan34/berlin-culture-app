@@ -1,12 +1,19 @@
 'use client';
 
 import type { Venue } from '@/lib/types';
+import type { VenueSummary } from '@/lib/eventsServer';
 import { getVenueDisplayName, isAggregatorVenue } from '@/lib/venueCategories';
+
+const MAX_REAL_VENUES = 15;
 
 interface Props {
   venues: Venue[];
   selected: Set<number>;
   onToggle: (id: number) => void;
+  counts: Record<number, number>;
+  realVenues: VenueSummary[];
+  selectedKeys: Set<string>;
+  onToggleKey: (key: string) => void;
   onClear: () => void;
 }
 
@@ -18,11 +25,14 @@ function pillClass(active: boolean): string {
   }`;
 }
 
-export function VenueFilter({ venues, selected, onToggle, onClear }: Props) {
-  const allSelected = selected.size === 0;
+export function VenueFilter({ venues, selected, onToggle, counts, realVenues, selectedKeys, onToggleKey, onClear }: Props) {
+  const allSelected = selected.size === 0 && selectedKeys.size === 0;
 
-  const realVenues = venues.filter(v => !isAggregatorVenue(v.id));
+  const brickAndMortar = venues.filter(v => !isAggregatorVenue(v.id));
   const feeds = venues.filter(v => isAggregatorVenue(v.id));
+  const shownRealVenues = realVenues.filter(
+    (v, i) => i < MAX_REAL_VENUES || selectedKeys.has(v.venue_key),
+  );
 
   const renderGroup = (label: string, list: Venue[]) =>
     list.length > 0 && (
@@ -34,6 +44,7 @@ export function VenueFilter({ venues, selected, onToggle, onClear }: Props) {
           {list.map(v => (
             <button key={v.id} onClick={() => onToggle(v.id)} className={pillClass(selected.has(v.id))}>
               {getVenueDisplayName(v.id, v.name)}
+              <span className="ml-1.5 text-xs opacity-60">{counts[v.id] ?? 0}</span>
             </button>
           ))}
         </div>
@@ -45,8 +56,30 @@ export function VenueFilter({ venues, selected, onToggle, onClear }: Props) {
       <button onClick={onClear} className={pillClass(allSelected)}>
         Everywhere
       </button>
-      {renderGroup('Venues', realVenues)}
-      {renderGroup('Community feeds', feeds)}
+      {renderGroup('Venues', brickAndMortar)}
+      {renderGroup('Community groups&pages', feeds)}
+      {shownRealVenues.length > 0 && (
+        <div className="space-y-0.5">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-stone-400 dark:text-stone-500">
+            Venues found in community posts
+          </p>
+          <p className="text-[11px] text-stone-400/70 dark:text-stone-500/70">
+            Real venues we've spotted mentioned inside events from the groups above.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {realVenues.slice(0, MAX_REAL_VENUES).map(v => (
+              <button
+                key={v.venue_key}
+                onClick={() => onToggleKey(v.venue_key)}
+                className={pillClass(selectedKeys.has(v.venue_key))}
+              >
+                {v.venue_name}
+                <span className="ml-1.5 text-xs opacity-60">{v.count}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
