@@ -115,7 +115,7 @@ export class ResidentAdvisorAdapter implements WebsiteAdapter {
                 seen.add(key);
                 return true;
             })
-            .map(event => {
+            .map((event): NormalizedEvent | null => {
                 const startTime = event.startTime ?? event.date;
                 if (!startTime) return null;
 
