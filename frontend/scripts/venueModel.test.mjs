@@ -35,8 +35,15 @@ function resolveVenue(event, dbName) {
     : { title: event.title, venue: null };
   const displayTitle = legacyParsed.title;
   const venueName = event.venue_name ?? legacyParsed.venue ?? sourceName;
-  const viaSource = (event.venue_name || legacyParsed.venue) ? sourceName : null;
+  const sameAsSource = venueName.trim().toLowerCase() === sourceName.trim().toLowerCase();
+  const viaSource = (event.venue_name || legacyParsed.venue) && !sameAsSource ? sourceName : null;
   return { displayTitle, venueName, viaSource };
+}
+
+// Mirrors venueCategories.ts isSelfVenueKey().
+const SELF_VENUE_KEYS = { 3: 'village berlin' };
+function isSelfVenueKey(venueId, venueKey) {
+  return venueKey != null && SELF_VENUE_KEYS[venueId] === venueKey;
 }
 
 // Mirrors EventFeed.tsx's venueBucketKey().
@@ -98,6 +105,26 @@ check(
   resolveVenue({ venue_id: 8, title: 'Artist X: Retrospective', venue_name: 'KW Institute' }, 'ART at Berlin'),
   { displayTitle: 'Artist X: Retrospective', venueName: 'KW Institute', viaSource: 'ART at Berlin' },
 );
+
+// 7. Village Berlin reports its own space -> no redundant "via Village Berlin".
+check(
+  'Village, venue_name same as source -> no "via"',
+  resolveVenue({ venue_id: 3, title: 'Yoga', venue_name: 'Village Berlin' }, 'Village Berlin'),
+  { displayTitle: 'Yoga', venueName: 'Village Berlin', viaSource: null },
+);
+
+// 8. Brick-and-mortar venue with venue_name equal to the source -> no "via" either.
+check(
+  'SO36, venue_name same as source -> no "via"',
+  resolveVenue({ venue_id: 5, title: 'Punk Night', venue_name: 'SO36' }, 'SO36'),
+  { displayTitle: 'Punk Night', venueName: 'SO36', viaSource: null },
+);
+
+// Self-venue pills: Village's own name is skipped, real venues and other sources are not.
+check('self venue: Village own key is skipped', isSelfVenueKey(3, 'village berlin'), true);
+check('self venue: other Village location is kept', isSelfVenueKey(3, 'tempelhofer feld'), false);
+check('self venue: same key on another source is kept', isSelfVenueKey(7, 'village berlin'), false);
+check('self venue: null key is not self', isSelfVenueKey(3, null), false);
 
 // Bucket key: real venue_key wins; falls back to a per-source bucket.
 check('bucket key uses venue_key when present', venueBucketKey({ venue_id: 7, venue_key: 'tresor' }), 'tresor');

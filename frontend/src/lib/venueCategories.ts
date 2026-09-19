@@ -49,6 +49,20 @@ export function isAggregatorVenue(venueId: number): boolean {
 }
 
 /**
+ * Some aggregators only ever report their own space as the venue (Village's API says
+ * "Village Berlin" for every located event). That adds no information beyond the source
+ * pill, so it's kept out of the "Places from community listings" pills.
+ * Values are normalized venue_keys (see normalizeVenueKey in the scraper).
+ */
+const SELF_VENUE_KEYS: Record<number, string> = {
+  3: 'village berlin',
+};
+
+export function isSelfVenueKey(venueId: number, venueKey: string | null | undefined): boolean {
+  return venueKey != null && SELF_VENUE_KEYS[venueId] === venueKey;
+}
+
+/**
  * Phase 1 (presentation-only): the real venue is embedded in aggregator titles
  * as "Event name @ Venue". Split it back out for display. Returns the original
  * title and a null venue when no separator is present.

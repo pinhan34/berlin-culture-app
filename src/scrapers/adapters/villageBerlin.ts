@@ -1,5 +1,5 @@
 import type { WebsiteAdapter, NormalizedEvent } from '../interfaces.js';
-import { normalizeVenueKey } from '../venueKey.js';
+import { resolveVillageVenue } from '../villageVenue.js';
 
 const SOURCE = 'village-berlin';
 
@@ -62,7 +62,7 @@ export class VillageBerlinAdapter implements WebsiteAdapter {
             .map((e) => {
                 // Village's own API exposes the real per-event location, unlike
                 // Telegram/ART at Berlin where the venue has to be parsed out of text.
-                const venueName = e.location ? this.decodeHtml(e.location).trim() : null;
+                const venue = resolveVillageVenue(e.location ? this.decodeHtml(e.location) : null);
                 return {
                     venue_id: this.venueId,
                     title: this.decodeHtml(e.title),
@@ -70,8 +70,7 @@ export class VillageBerlinAdapter implements WebsiteAdapter {
                     duration: this.extractDuration(e),
                     event_url: e.permalink,
                     source: SOURCE,
-                    venue_name: venueName || null,
-                    venue_key: venueName ? normalizeVenueKey(venueName) : null,
+                    ...venue,
                 };
             });
     }

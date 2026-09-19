@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect, useCallback, type ReactNode } from 'react';
 import type { Event, Venue } from '@/lib/types';
 import type { VenueSummary } from '@/lib/eventsServer';
-import { getVenueDisplayName, isAggregatorVenue } from '@/lib/venueCategories';
+import { getVenueDisplayName, isAggregatorVenue, isSelfVenueKey } from '@/lib/venueCategories';
 import { useLocalStorage } from '@/lib/useLocalStorage';
 import { getInteractions, syncInteraction, type Interaction } from '@/lib/interactions';
 import { buildTasteProfile, scoreEvent, explainEvent, type TasteHints } from '@/lib/recommendations';
@@ -377,7 +377,7 @@ export function EventFeed({ events, venues }: Props) {
   const realVenues = useMemo<VenueSummary[]>(() => {
     const byKey = new Map<string, { v: VenueSummary; total: number }>();
     for (const e of qualityEvents) {
-      if (!e.venue_key || !isAggregatorVenue(e.venue_id)) continue;
+      if (!e.venue_key || !isAggregatorVenue(e.venue_id) || isSelfVenueKey(e.venue_id, e.venue_key)) continue;
       let entry = byKey.get(e.venue_key);
       if (!entry) {
         entry = {

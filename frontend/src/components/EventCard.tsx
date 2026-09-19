@@ -70,7 +70,9 @@ export function EventCard({ event, highlight, isNew = false, isFavourited = fals
                         : { title: event.title, venue: null };
   const displayTitle = legacyParsed.title;
   const venueName = event.venue_name ?? legacyParsed.venue ?? sourceName;
-  const viaSource = (event.venue_name || legacyParsed.venue) ? sourceName : null;
+  // "via X" only adds info when the real venue differs from the source (skip "SO36 via SO36").
+  const sameAsSource = venueName.trim().toLowerCase() === sourceName.trim().toLowerCase();
+  const viaSource = (event.venue_name || legacyParsed.venue) && !sameAsSource ? sourceName : null;
 
   const category = getVenueCategory(event.venue_id);
   const style = CATEGORY_STYLES[category];

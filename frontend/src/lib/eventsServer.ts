@@ -5,7 +5,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import type { Event } from './types';
-import { isAggregatorVenue } from './venueCategories';
+import { isAggregatorVenue, isSelfVenueKey } from './venueCategories';
 
 // venue_id 4 (neurodivergent-berlin.com) is retired — MeetUp (id 2) covers it with
 // better data. Kept in sync with the homepage query in app/page.tsx.
@@ -70,7 +70,7 @@ export async function fetchDedupedVenues(): Promise<VenueSummary[]> {
 
   const counts = new Map<string, VenueSummary>();
   for (const row of data as { venue_id: number; venue_key: string; venue_name: string | null }[]) {
-    if (!isAggregatorVenue(row.venue_id)) continue;
+    if (!isAggregatorVenue(row.venue_id) || isSelfVenueKey(row.venue_id, row.venue_key)) continue;
     const existing = counts.get(row.venue_key);
     if (existing) {
       existing.count += 1;
