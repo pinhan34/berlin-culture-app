@@ -2,6 +2,12 @@ import { chromium, type Page, type Response } from 'playwright';
 import type { WebsiteAdapter, NormalizedEvent } from '../interfaces.js';
 import { resolveMeetupVenue, type MeetUpVenueInput } from '../meetupVenue.js';
 
+const MAX_ATTEMPTS = 3;           // per group, on a thrown error (e.g. page.goto timeout)
+const RETRY_BACKOFF_MS = 5_000;   // wait 5s after attempt 1, 10s after attempt 2
+const GROUP_DELAY_MS = 3_000;     // pause between groups
+
+const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
+
 interface MeetUpEventNode extends MeetUpVenueInput {
     id: string;
     title: string;
@@ -31,21 +37,36 @@ export class MeetUpAdapter implements WebsiteAdapter {
         const allEvents: NormalizedEvent[] = [];
 
         try {
-            for (const slug of this.groupSlugs) {
+            for (const [i, slug] of this.groupSlugs.entries()) {
+                // Space requests out: back-to-back page loads from one CI IP are the likely
+                // trigger for MeetUp's intermittent goto timeouts.
+                if (i > 0) await sleep(GROUP_DELAY_MS);
+
                 const groupUrl = `${this.targetUrl}/${slug}/events/`;
                 console.log(`[${this.sourceName}] Scraping group: ${slug} → ${groupUrl}`);
 
-                const context = await browser.newContext();
-                const page = await context.newPage();
+                let events: NormalizedEvent[] | null = null;
+                for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+                    // Fresh context per attempt so a retry doesn't inherit a stuck page or cookies.
+                    const context = await browser.newContext();
+                    const page = await context.newPage();
+                    try {
+                        events = await this.scrapeGroup(page, groupUrl, slug);
+                        break;
+                    } catch (error) {
+                        const reason = error instanceof Error ? error.message.split('\n')[0] : String(error);
+                        console.error(`[${this.sourceName}][${slug}] Attempt ${attempt}/${MAX_ATTEMPTS} failed: ${reason}`);
+                    } finally {
+                        await context.close();
+                    }
+                    if (attempt < MAX_ATTEMPTS) await sleep(RETRY_BACKOFF_MS * attempt);
+                }
 
-                try {
-                    const events = await this.scrapeGroup(page, groupUrl, slug);
+                if (events) {
                     allEvents.push(...events);
                     console.log(`[${this.sourceName}][${slug}] Captured ${events.length} events.`);
-                } catch (error) {
-                    console.error(`[${this.sourceName}][${slug}] Group scrape failed:`, error);
-                } finally {
-                    await context.close();
+                } else {
+                    console.error(`[${this.sourceName}][${slug}] Giving up after ${MAX_ATTEMPTS} attempts.`);
                 }
             }
 
