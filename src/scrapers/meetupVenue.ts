@@ -7,6 +7,17 @@ export interface MeetUpVenueInput {
     eventType?: string | null;
 }
 
+/** One MeetUp event as seen in the /gql responses or the page's embedded __NEXT_DATA__. */
+export interface MeetUpEventNode extends MeetUpVenueInput {
+    id: string;
+    title: string;
+    dateTime: string;
+    endTime?: string;
+    eventUrl: string;
+    going?: number;
+    description?: string;
+}
+
 export interface VenueFields {
     venue_name: string | null;
     venue_key: string | null;

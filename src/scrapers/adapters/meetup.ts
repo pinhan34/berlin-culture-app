@@ -1,22 +1,15 @@
 import { chromium, type Page, type Response } from 'playwright';
 import type { WebsiteAdapter, NormalizedEvent } from '../interfaces.js';
-import { resolveMeetupVenue, type MeetUpVenueInput } from '../meetupVenue.js';
+import { resolveMeetupVenue, type MeetUpEventNode } from '../meetupVenue.js';
+import { fetchGroupNodesViaHttp } from '../meetupHttp.js';
 
-const MAX_ATTEMPTS = 3;           // per group, on a thrown error (e.g. page.goto timeout)
-const RETRY_BACKOFF_MS = 5_000;   // wait 5s after attempt 1, 10s after attempt 2
-const GROUP_DELAY_MS = 3_000;     // pause between groups
+const MAX_ATTEMPTS = 2;           // browser attempts per group, on a thrown error
+const RETRY_BACKOFF_MS = 5_000;   // wait before the next browser attempt
+const GOTO_TIMEOUT_MS = 30_000;
+const GQL_WAIT_MS = 15_000;       // how long to wait for the first /gql event data after DOM load
+const GQL_SETTLE_MS = 2_000;      // extra time after the first hit, so later /gql calls are captured too
 
 const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
-
-interface MeetUpEventNode extends MeetUpVenueInput {
-    id: string;
-    title: string;
-    dateTime: string;
-    endTime?: string;
-    eventUrl: string;
-    going?: number;
-    description?: string;
-}
 
 export class MeetUpAdapter implements WebsiteAdapter {
     sourceName = 'MeetUp';
@@ -37,11 +30,7 @@ export class MeetUpAdapter implements WebsiteAdapter {
         const allEvents: NormalizedEvent[] = [];
 
         try {
-            for (const [i, slug] of this.groupSlugs.entries()) {
-                // Space requests out: back-to-back page loads from one CI IP are the likely
-                // trigger for MeetUp's intermittent goto timeouts.
-                if (i > 0) await sleep(GROUP_DELAY_MS);
-
+            for (const slug of this.groupSlugs) {
                 const groupUrl = `${this.targetUrl}/${slug}/events/`;
                 console.log(`[${this.sourceName}] Scraping group: ${slug} → ${groupUrl}`);
 
@@ -62,11 +51,24 @@ export class MeetUpAdapter implements WebsiteAdapter {
                     if (attempt < MAX_ATTEMPTS) await sleep(RETRY_BACKOFF_MS * attempt);
                 }
 
-                if (events) {
+                // Browser path failed or found nothing -> try the browser-free HTTP fallback.
+                if (!events || events.length === 0) {
+                    console.log(`[${this.sourceName}][${slug}] Browser path ${events ? 'found nothing' : 'failed'}; trying HTTP fallback...`);
+                    try {
+                        const nodes = await fetchGroupNodesViaHttp(groupUrl);
+                        events = this.normalizeGraphQLNodes(nodes, slug);
+                        console.log(`[${this.sourceName}][${slug}] HTTP fallback captured ${events.length} events.`);
+                    } catch (error) {
+                        const reason = error instanceof Error ? error.message.split('\n')[0] : String(error);
+                        console.error(`[${this.sourceName}][${slug}] HTTP fallback failed: ${reason}`);
+                    }
+                }
+
+                if (events && events.length > 0) {
                     allEvents.push(...events);
                     console.log(`[${this.sourceName}][${slug}] Captured ${events.length} events.`);
                 } else {
-                    console.error(`[${this.sourceName}][${slug}] Giving up after ${MAX_ATTEMPTS} attempts.`);
+                    console.error(`[${this.sourceName}][${slug}] No events obtained for this group.`);
                 }
             }
 
@@ -93,10 +95,24 @@ export class MeetUpAdapter implements WebsiteAdapter {
             }
         });
 
-        await page.goto(groupUrl, { waitUntil: 'networkidle' });
+        try {
+            // 'domcontentloaded', not 'networkidle': MeetUp keeps background requests going,
+            // so the network can stay "busy" past the timeout even on a fully loaded page.
+            const response = await page.goto(groupUrl, { waitUntil: 'domcontentloaded', timeout: GOTO_TIMEOUT_MS });
+            console.log(`[${this.sourceName}][${slug}] HTTP ${response?.status() ?? '?'} (DOM loaded). Waiting for event data...`);
 
-        // Give the page a moment to fire any lazy GraphQL requests
-        await page.waitForTimeout(2000);
+            // Wait for the first /gql event payload, then a short settle for any later ones.
+            const deadline = Date.now() + GQL_WAIT_MS;
+            while (capturedNodes.length === 0 && Date.now() < deadline) {
+                await page.waitForTimeout(500);
+            }
+            if (capturedNodes.length > 0) await page.waitForTimeout(GQL_SETTLE_MS);
+        } catch (error) {
+            // Diagnostics: what did we actually get? (block/challenge pages show up in the title)
+            const title = await page.title().catch(() => '?');
+            console.error(`[${this.sourceName}][${slug}] Diagnostics: url=${page.url()} title="${title}"`);
+            throw error;
+        }
 
         if (capturedNodes.length > 0) {
             console.log(`[${this.sourceName}][${slug}] GraphQL interception captured ${capturedNodes.length} event node(s).`);

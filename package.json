@@ -6,7 +6,7 @@
   "scripts": {
     "scrape": "node --loader ts-node/esm src/scrapers/runner.ts",
     "scrape:telegram": "node --loader ts-node/esm src/scrapers/testAdapters.ts telegram",
-    "test": "node --loader ts-node/esm src/scrapers/venueKey.test.ts && node --loader ts-node/esm src/scrapers/meetupVenue.test.ts",
+    "test": "node --loader ts-node/esm src/scrapers/venueKey.test.ts && node --loader ts-node/esm src/scrapers/meetupVenue.test.ts && node --loader ts-node/esm src/scrapers/meetupHttp.test.ts",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
