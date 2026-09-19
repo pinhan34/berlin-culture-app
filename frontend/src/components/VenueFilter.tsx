@@ -65,10 +65,10 @@ export function VenueFilter({ venues, selected, onToggle, counts, realVenues, se
       {shownRealVenues.length > 0 && (
         <div className="space-y-0.5">
           <p className="text-[11px] font-bold uppercase tracking-wider text-stone-400 dark:text-stone-500">
-            Venues found in community posts
+            Places from community listings
           </p>
           <p className="text-[11px] text-stone-400/70 dark:text-stone-500/70">
-            Real venues we've spotted mentioned inside events from the groups above.
+            Where events from the groups above actually take place, including online.
           </p>
           <div className="flex flex-wrap gap-2">
             {shownRealVenues.map(v => (

@@ -14,6 +14,9 @@ export function normalizeVenueKey(raw: string): string {
         .trim();
 }
 
+/** Display name for events with no physical location. Shared so every adapter produces the same venue_key ('online'). */
+export const ONLINE_VENUE_NAME = 'Online';
+
 /** Hyphenated variant of normalizeVenueKey, for building `source` slugs (e.g. 'telegram:queer-events-berlin'). */
 export function slugify(raw: string): string {
     return normalizeVenueKey(raw).replace(/\s+/g, '-');

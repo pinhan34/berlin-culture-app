@@ -1,7 +1,8 @@
 import { chromium, type Page, type Response } from 'playwright';
 import type { WebsiteAdapter, NormalizedEvent } from '../interfaces.js';
+import { resolveMeetupVenue, type MeetUpVenueInput } from '../meetupVenue.js';
 
-interface MeetUpEventNode {
+interface MeetUpEventNode extends MeetUpVenueInput {
     id: string;
     title: string;
     dateTime: string;
@@ -109,6 +110,9 @@ export class MeetUpAdapter implements WebsiteAdapter {
                     eventUrl: payload.eventUrl,
                     going: payload.going,
                     description: typeof payload.description === 'string' ? payload.description : undefined,
+                    venue: payload.venue && typeof payload.venue === 'object' ? payload.venue : null,
+                    isOnline: typeof payload.isOnline === 'boolean' ? payload.isOnline : null,
+                    eventType: typeof payload.eventType === 'string' ? payload.eventType : null,
                 });
                 return results;
             }
@@ -169,6 +173,7 @@ export class MeetUpAdapter implements WebsiteAdapter {
                     event_url: (node.eventUrl as string | null) ?? null,
                     description,
                     source: `meetup:${slug}`,
+                    ...resolveMeetupVenue(node),
                 };
             })
             .filter((e): e is NormalizedEvent => !!e.title && !!e.start_time);
