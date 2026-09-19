@@ -335,7 +335,7 @@ function isVenueClean(venue: string): boolean {
     if (v.length < 2 || v.length > 60) return false; // too short/long for a venue name
     if (/\d{1,2}\.\-?\d{1,2}\.\d{2,4}|\d{1,2}\.\d{1,2}\./.test(v)) return false; // looks like a date
     const words = v.split(/\s+/);
-    if (words.length > 6) return false;                        // real venue names are rarely 7+ words
+    if (words.length > 6) return false; // real venue names are rarely 7+ words
     if (/^(we|i|this|come|join|get|are|is)\b/i.test(v)) return false; // sentence starters
     return true;
 }

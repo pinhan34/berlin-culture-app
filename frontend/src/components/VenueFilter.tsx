@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import type { Venue } from '@/lib/types';
 import type { VenueSummary } from '@/lib/eventsServer';
 import { getVenueDisplayName, isAggregatorVenue } from '@/lib/venueCategories';
@@ -26,13 +27,16 @@ function pillClass(active: boolean): string {
 }
 
 export function VenueFilter({ venues, selected, onToggle, counts, realVenues, selectedKeys, onToggleKey, onClear }: Props) {
+  const [expanded, setExpanded] = useState(false);
   const allSelected = selected.size === 0 && selectedKeys.size === 0;
 
   const brickAndMortar = venues.filter(v => !isAggregatorVenue(v.id));
   const feeds = venues.filter(v => isAggregatorVenue(v.id));
-  const shownRealVenues = realVenues.filter(
+  const collapsedRealVenues = realVenues.filter(
     (v, i) => i < MAX_REAL_VENUES || selectedKeys.has(v.venue_key),
   );
+  const shownRealVenues = expanded ? realVenues : collapsedRealVenues;
+  const hiddenCount = realVenues.length - collapsedRealVenues.length;
 
   const renderGroup = (label: string, list: Venue[]) =>
     list.length > 0 && (
@@ -67,7 +71,7 @@ export function VenueFilter({ venues, selected, onToggle, counts, realVenues, se
             Real venues we've spotted mentioned inside events from the groups above.
           </p>
           <div className="flex flex-wrap gap-2">
-            {realVenues.slice(0, MAX_REAL_VENUES).map(v => (
+            {shownRealVenues.map(v => (
               <button
                 key={v.venue_key}
                 onClick={() => onToggleKey(v.venue_key)}
@@ -77,6 +81,15 @@ export function VenueFilter({ venues, selected, onToggle, counts, realVenues, se
                 <span className="ml-1.5 text-xs opacity-60">{v.count}</span>
               </button>
             ))}
+            {hiddenCount > 0 && (
+              <button
+                onClick={() => setExpanded(e => !e)}
+                aria-expanded={expanded}
+                className={pillClass(false)}
+              >
+                {expanded ? 'Show less' : `+${hiddenCount} more`}
+              </button>
+            )}
           </div>
         </div>
       )}

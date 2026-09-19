@@ -6,3 +6,6 @@ dist/
 .next/
 frontend/.next/
 frontend/node_modules/
+
+# personal notes
+reactnotes.md
