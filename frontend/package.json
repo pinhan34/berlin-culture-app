@@ -9,7 +9,7 @@
     "lint": "eslint",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "node scripts/classifiers.test.mjs && node scripts/venueModel.test.mjs"
+    "test": "node scripts/classifiers.test.mjs && node scripts/venueModel.test.mjs && tsx scripts/thisWeek.test.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",
@@ -28,6 +28,7 @@
     "eslint-config-prettier": "^10.1.8",
     "prettier": "^3.9.8",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5"
   }
 }

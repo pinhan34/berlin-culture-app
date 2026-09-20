@@ -50,6 +50,7 @@ stays in layers: identical events/order for everyone, taste shown only as marker
   confirm nothing changes in `page.tsx`.
 
 ## Implementation steps (each ends in a verifiable state)
+After completing each numbered step: run npm run lint and npm test in frontend/. Stage only the files that step touched, and provide me with a commit message with one concise sentence. Then stop and wait for my go-ahead before the next step.
 
 ### 1. Pure logic + tests: `frontend/src/lib/thisWeek.ts` (new)
 No `@/` imports; `import type { Event } from './types'` only.
