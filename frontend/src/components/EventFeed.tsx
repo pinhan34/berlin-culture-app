@@ -557,6 +557,7 @@ export function EventFeed({ events, venues }: Props) {
           onFavouriteToggle={handleFavouriteToggle}
           onHide={handleHide}
           isNew={id => isFreshData && newIds.has(id)}
+          reasonOf={hasTaste ? e => explainEvent(e, profile, 1)[0] : undefined}
           hiddenCount={hiddenIds.length}
           onShowHidden={() => setHiddenIds([])}
         />
