@@ -111,13 +111,14 @@ export function ThisWeek({
               </div>
             </div>
           ))}
-          {!expanded && totalCount > INITIAL_VISIBLE && (
+          {totalCount > INITIAL_VISIBLE && (
             <button
               type="button"
-              onClick={() => setExpanded(true)}
+              onClick={() => setExpanded(v => !v)}
+              aria-expanded={expanded}
               className="mx-auto block rounded-full border border-fuchsia-300 px-4 py-1.5 text-xs font-semibold text-fuchsia-600 hover:bg-fuchsia-50 dark:border-fuchsia-800 dark:text-fuchsia-300 dark:hover:bg-fuchsia-950/40"
             >
-              See all {totalCount}
+              {expanded ? 'Show fewer' : `See all ${totalCount}`}
             </button>
           )}
         </div>
