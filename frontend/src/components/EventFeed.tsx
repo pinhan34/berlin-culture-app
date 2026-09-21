@@ -17,6 +17,9 @@ import { QuickPicks } from './QuickPicks';
 import { SurpriseMe } from './SurpriseMe';
 import { JustAdded } from './JustAdded';
 import { ForYou } from './ForYou';
+import { ThisWeek } from './ThisWeek';
+import { ThisWeekSkeleton } from './Skeletons';
+import { getThisWeek } from '@/lib/thisWeek';
 import { MoodTiles } from './MoodTiles';
 import { CommunityLanes } from './CommunityLanes';
 import { CalendarSubscribe } from './CalendarSubscribe';
@@ -298,6 +301,13 @@ export function EventFeed({ events, venues }: Props) {
   );
   const hasTaste = mounted && profile.totalSignals >= TASTE_THRESHOLD;
 
+  // Shared "This week" block: computed after mount (needs the client clock), and
+  // deliberately ignores every filter and taste signal so all visitors see the same list.
+  const thisWeek = useMemo(
+    () => (mounted ? getThisWeek(cappedEvents, { now: new Date(), hiddenIds: hiddenSet }) : null),
+    [mounted, cappedEvents, hiddenSet],
+  );
+
   // Precompute vibe tags per event once.
   const vibesByEvent = useMemo(() => {
     const map = new Map<number, Vibe[]>();
@@ -535,6 +545,23 @@ export function EventFeed({ events, venues }: Props) {
           <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400" />
           Updated {timeAgo(lastUpdated)}
         </div>
+      )}
+
+      {/* This week — shared and unfiltered, always first */}
+      {thisWeek ? (
+        <ThisWeek
+          events={thisWeek.events}
+          mode={thisWeek.mode}
+          totalCount={thisWeek.totalCount}
+          isFavourited={id => favouriteSet.has(id)}
+          onFavouriteToggle={handleFavouriteToggle}
+          onHide={handleHide}
+          isNew={id => isFreshData && newIds.has(id)}
+          hiddenCount={hiddenIds.length}
+          onShowHidden={() => setHiddenIds([])}
+        />
+      ) : (
+        <ThisWeekSkeleton />
       )}
 
       {/* ───────── Unified filter panel: 4 distinct, numbered filters ───────── */}

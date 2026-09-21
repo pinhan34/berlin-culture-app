@@ -84,3 +84,17 @@ export function VenueCardSkeleton() {
     </div>
   );
 }
+
+export function ThisWeekSkeleton() {
+  return (
+    <section>
+      <div className="skeleton h-4 w-28 mb-1" />
+      <div className="skeleton h-3 w-52 mb-3" />
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {[1, 2, 3].map(i => (
+          <EventCardSkeleton key={i} />
+        ))}
+      </div>
+    </section>
+  );
+}
