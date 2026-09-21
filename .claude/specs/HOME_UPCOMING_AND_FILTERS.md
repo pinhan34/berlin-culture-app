@@ -4,8 +4,9 @@ Restructure the home feed so the first thing a visitor sees is **what is coming 
 soon, with no filter applied**, and the four filter groups move behind a single
 collapsed **Filters** control instead of a numbered 1-2-3-4 flow.
 
-**Status:** Draft v2, awaiting your review. Decision 1 (personalization) is settled as
-a hybrid in layers; the rest are recommendations to confirm before a plan is written.
+**Status:** Implemented (plan: `.claude/plans/home-this-week-and-filters.md.md`, steps 1-6).
+Decision 1 (personalization) is a hybrid in layers; Decision 10 (capped pool) was added
+while planning. Pending: the manual browser checks in the plan's Verification section.
 
 ---
 
@@ -134,8 +135,8 @@ Note there are **four** filter groups, not three. "When are you free?" is the fo
 6. "Browse everything" (unchanged; this is the list the filters act on)
 
 ### This week
-- Source pool: the same quality-filtered, URL-deduplicated pool the feed already uses
-  (`qualityEvents`), minus events the visitor hid ("Not for me"). **No** community,
+- Source pool: the default feed's pool with its per-venue caps (`cappedEvents`, see
+  Decision 10), minus events the visitor hid ("Not for me"). **No** community,
   vibe, venue, date or favourites filter applied.
 - Window: now to the end of day 7, in Europe/Berlin time.
 - Grouped by day using the existing day-heading style; today first.
@@ -169,6 +170,7 @@ Each has a recommendation. Change any of them and the rest of the spec adapts.
 | 6 | Filters panel default state | **Collapsed every visit** (session-only, not remembered). Chips + the badge make persisted filters obvious. |
 | 7 | Where do `ForYou` / `JustAdded` go? | **Below the Filters bar, unchanged.** They respond to filters today, so they belong after the control. Keeps the change small. |
 | 8 | Section name | **"This week"**, switching to "Coming up next" under Decision 2's fallback. |
+| 10 | Which pool feeds "This week"? | **`cappedEvents`** (per-venue caps), not the uncapped `qualityEvents`. A chronological 8-event cut would otherwise be dominated by one high-volume source; the caps keep the earliest events per venue bucket, so near-term events survive. Known limit: one venue exceeding its cap within the week can still lose a near-term event, same as the default feed. |
 
 ---
 
@@ -208,9 +210,9 @@ Each has a recommendation. Change any of them and the rest of the spec adapts.
 - `EventFeed.tsx` is ~770 lines and holds most of the page state; extracting "This
   week" and the bar into their own components is preferable to growing it further, but
   needs care not to break `isDefaultView` / `hasActiveContentFilter`.
-- The frontend tests mirror logic in standalone `.mjs` files (`frontend/scripts/`), so
-  new pure logic (the window and series rules) is best kept in a small `lib/` module so
-  it can be tested directly.
+- Existing frontend tests mirror logic in standalone `.mjs` files (`frontend/scripts/`).
+  The new window and series rules live in `lib/thisWeek.ts` (no `@/` imports) and are
+  tested directly against the real code via `tsx` (`scripts/thisWeek.test.ts`).
 - "This week" reads a lot of data already on the page; no new query is planned, so no
   performance risk is expected. Confirm during the plan.
 

@@ -60,7 +60,7 @@ npm run dev      # next dev
 npm run build    # next build
 npm run start    # next start
 npm run lint     # eslint
-npm test         # node scripts/classifiers.test.mjs && node scripts/venueModel.test.mjs
+npm test         # node scripts/classifiers.test.mjs && node scripts/venueModel.test.mjs && tsx scripts/thisWeek.test.ts
 npm run format         # prettier --write .
 npm run format:check   # prettier --check .
 ```
