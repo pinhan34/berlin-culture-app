@@ -18,6 +18,7 @@ import { SurpriseMe } from './SurpriseMe';
 import { JustAdded } from './JustAdded';
 import { ForYou } from './ForYou';
 import { ThisWeek } from './ThisWeek';
+import { FiltersPanel } from './FiltersPanel';
 import { ThisWeekSkeleton } from './Skeletons';
 import { getThisWeek } from '@/lib/thisWeek';
 import { MoodTiles } from './MoodTiles';
@@ -565,17 +566,17 @@ export function EventFeed({ events, venues }: Props) {
         <ThisWeekSkeleton />
       )}
 
-      {/* ───────── Unified filter panel: 4 distinct, numbered filters ───────── */}
-      <div className="space-y-4 rounded-2xl border border-stone-200 bg-gradient-to-b from-stone-50 to-stone-100/40 p-3 dark:border-purple-900/40 dark:from-[#16101e]/70 dark:to-[#120c1a]/40 sm:p-4">
-        <FilterSection step={1} emoji={'\u{1F3AD}'} title="Find your scene" accent="fuchsia">
+      {/* ───────── Collapsible filter panel: 4 distinct filters ───────── */}
+      <FiltersPanel activeCount={mounted ? activeChips.length : 0}>
+        <FilterSection emoji={'\u{1F3AD}'} title="Find your scene" accent="fuchsia">
           <CommunityLanes active={selectedCommunity} onSelect={handleSelectCommunity} counts={communityCounts} />
         </FilterSection>
 
-        <FilterSection step={2} emoji={'\u2728'} title="What are you in the mood for?" accent="amber">
+        <FilterSection emoji={'\u2728'} title="What are you in the mood for?" accent="amber">
           <MoodTiles active={selectedVibe} onSelect={handleSelectVibe} counts={vibeCounts} />
         </FilterSection>
 
-        <FilterSection step={3} emoji={'\u{1F4CD}'} title="Find your venue" accent="violet">
+        <FilterSection emoji={'\u{1F4CD}'} title="Find your venue" accent="violet">
           <VenueFilter
             venues={venues}
             selected={selectedVenues}
@@ -588,7 +589,7 @@ export function EventFeed({ events, venues }: Props) {
           />
         </FilterSection>
 
-        <FilterSection step={4} emoji={'\u{1F5D3}\uFE0F'} title="When are you free?" accent="emerald">
+        <FilterSection emoji={'\u{1F5D3}\uFE0F'} title="When are you free?" accent="emerald">
           <DateFilter value={dateRange} onChange={setDateRange} />
         </FilterSection>
 
@@ -608,7 +609,7 @@ export function EventFeed({ events, venues }: Props) {
             </button>
           </div>
         )}
-      </div>
+      </FiltersPanel>
 
       {/* Active filters summary — explicit reminder of current view */}
       {mounted && (
@@ -751,13 +752,11 @@ const SECTION_ACCENTS: Record<Accent, { badge: string; title: string; ring: stri
 };
 
 function FilterSection({
-  step,
   emoji,
   title,
   accent,
   children,
 }: {
-  step: number;
   emoji: string;
   title: string;
   accent: Accent;
@@ -767,11 +766,6 @@ function FilterSection({
   return (
     <section className={`rounded-xl border bg-white/70 p-4 shadow-sm dark:bg-[#1a1326]/40 ${a.ring}`}>
       <div className="mb-3 flex items-center gap-2.5">
-        <span
-          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br text-sm font-extrabold text-white shadow-sm ${a.badge}`}
-        >
-          {step}
-        </span>
         <h3 className="font-heading flex items-center gap-1.5 text-base font-extrabold tracking-tight sm:text-lg">
           <span aria-hidden="true">{emoji}</span>
           <span className={`bg-gradient-to-r bg-clip-text text-transparent ${a.title}`}>{title}</span>
