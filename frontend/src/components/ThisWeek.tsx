@@ -89,14 +89,13 @@ export function ThisWeek({
                 {dayEvents.map(e => {
                   const reason = reasonOf?.(e);
                   return (
-                    <div key={e.id} className="space-y-1.5">
+                    <div key={e.id} className="relative">
+                      {/* Overlaid, not in flow: a tag appearing after mount must not shift the layout. */}
                       {reason && (
-                        <div className="flex flex-wrap gap-1.5 px-1">
-                          <span className="inline-flex items-center gap-1 rounded-full bg-fuchsia-50 px-2 py-0.5 text-[10px] font-medium text-fuchsia-600 dark:bg-fuchsia-950/40 dark:text-fuchsia-300">
-                            <span aria-hidden="true">&#10024;</span>
-                            {reason}
-                          </span>
-                        </div>
+                        <span className="absolute left-3 top-0 z-10 inline-flex -translate-y-1/2 items-center gap-1 rounded-full bg-fuchsia-50 px-2 py-0.5 text-[10px] font-medium text-fuchsia-600 shadow-sm ring-1 ring-fuchsia-200 dark:bg-fuchsia-950 dark:text-fuchsia-300 dark:ring-fuchsia-800">
+                          <span aria-hidden="true">&#10024;</span>
+                          {reason}
+                        </span>
                       )}
                       <EventCard
                         event={e}
@@ -116,7 +115,7 @@ export function ThisWeek({
               type="button"
               onClick={() => setExpanded(v => !v)}
               aria-expanded={expanded}
-              className="mx-auto block rounded-full border border-fuchsia-300 px-4 py-1.5 text-xs font-semibold text-fuchsia-600 hover:bg-fuchsia-50 dark:border-fuchsia-800 dark:text-fuchsia-300 dark:hover:bg-fuchsia-950/40"
+              className="mx-auto block rounded-full border border-fuchsia-300 px-4 py-1.5 text-xs font-semibold text-fuchsia-600 hover:bg-fuchsia-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fuchsia-500dark:border-fuchsia-800 dark:text-fuchsia-300 dark:hover:bg-fuchsia-950/40"
             >
               {expanded ? 'Show fewer' : `See all ${totalCount}`}
             </button>

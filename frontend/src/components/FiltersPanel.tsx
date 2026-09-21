@@ -23,7 +23,7 @@ export function FiltersPanel({ activeCount, children }: Props) {
         onClick={() => setOpen(v => !v)}
         aria-expanded={open}
         aria-controls="filters-panel"
-        className="inline-flex items-center gap-2 rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-stone-700 shadow-sm transition-all hover:bg-stone-50 active:scale-95 dark:border-purple-900/50 dark:bg-[#16101e] dark:text-stone-200 dark:hover:bg-[#1a1326]"
+        className="inline-flex items-center gap-2 rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-stone-700 shadow-sm transition-all hover:bg-stone-50 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fuchsia-500dark:border-purple-900/50 dark:bg-[#16101e] dark:text-stone-200 dark:hover:bg-[#1a1326]"
       >
         <span aria-hidden="true">&#9881;&#65039;</span>
         Filters
