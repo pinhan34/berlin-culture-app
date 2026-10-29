@@ -22,14 +22,17 @@ them.
 ## ⚠️ Critical rules — read before any code change
 
 - **Never mix Supabase keys**: root scraper uses `SUPABASE_SERVICE_ROLE_KEY` (admin, write
-  access). Frontend uses `NEXT_PUBLIC_SUPABASE_ANON_KEY` (read-only, RLS-safe). Never use the
-  service role key in frontend code.
+  access). Frontend pages use `NEXT_PUBLIC_SUPABASE_ANON_KEY` (read-only, RLS-safe). The
+  frontend's server-only code (API routes, `/stats`, `trendingServer.ts`, `visitsServer.ts`) may
+  use `SUPABASE_SERVICE_ROLE_KEY`, but it must never reach client components or a `NEXT_PUBLIC_*`
+  variable.
 - **Migrations are applied MANUALLY**: generate the SQL file in `supabase/migrations/`, then
   stop and tell the user to apply it against Supabase. Never attempt to run migrations
   automatically.
-- **Phase 2 of the venue model is NOT implemented**: do not add `venue_name`, `venue_key`,
-  `source`, `city`, `lat`, `lng` columns to `events`, and do not change the scraper write path
-  to populate them, unless explicitly asked to start Phase 2. Read `docs/VENUE_MODEL.md` first.
+- **Venue model Phase 2 is implemented** (migration `006_venue_model_phase2.sql`): adapters
+  write `source`, `venue_name`, `venue_key`, `city`, `lat`, `lng` on `events`, and the frontend
+  reads `venue_key`/`venue_name`. `venue_id` still means the *source* — never repurpose it to mean
+  the real venue. Read `.claude/specs/VENUE_MODEL.md` before changing this model.
 - **Retired venue id 4** must stay filtered out of every feed query — see `RETIRED_VENUE_IDS`
   in `frontend/src/lib/eventsServer.ts`. Never reuse id 4 for a new source.
 - **ICS/calendar feeds** must always use the original event URL, never `affiliateUrl()` — see
@@ -41,7 +44,7 @@ them.
 ```
 npm run scrape              # run the full orchestrator (src/scrapers/runner.ts) — all adapters, sequential
 npm run scrape:telegram     # run only the Telegram adapter (src/scrapers/testAdapters.ts telegram)
-npm test                    # node --loader ts-node/esm src/scrapers/venueKey.test.ts
+npm test                    # venueKey, meetupVenue, meetupHttp, villageVenue tests (src/scrapers/*.test.ts)
 npm run format              # prettier --write .
 npm run format:check        # prettier --check .
 ```
@@ -92,7 +95,7 @@ than assuming familiar behavior.
   an uncaught exception.
 - Some source venue ids are "aggregators" standing in for many real-world venues (Telegram,
   MeetUp, Village Berlin, ART at Berlin) rather than one brick-and-mortar place — see
-  `docs/VENUE_MODEL.md`. One venue id (4, neurodivergent-berlin.com) is retired; it must stay
+  `.claude/specs/VENUE_MODEL.md`. One venue id (4, neurodivergent-berlin.com) is retired; it must stay
   filtered out of every feed query on the frontend (see `RETIRED_VENUE_IDS` in
   `frontend/src/lib/eventsServer.ts`) rather than being reused for a new source.
 
@@ -100,7 +103,8 @@ than assuming familiar behavior.
 This is where most of the domain logic lives, not in components:
 - `types.ts` — canonical `Event`/`Venue` shapes matching the DB schema.
 - `eventsServer.ts` / `trendingServer.ts` / `visitsServer.ts` — server-side Supabase queries
-  (anon key, read-only, RLS-safe) shared by pages and API routes.
+  shared by pages and API routes (`eventsServer.ts` uses the anon key; the trending/visits
+  aggregations use the service role key server-side).
 - `venueCategories.ts` — maps each venue id to a broad category (`art`/`music`/`community`/
   `personal`), a display-name override, and (Phase 1 of the venue-model rework) parses the real
   venue back out of aggregator titles formatted as `"Event name @ Venue"` via
@@ -133,7 +137,7 @@ table), `track` / `track-visit` (interaction + UTM attribution logging), `trendi
 `admin/add-event` (manual event entry, paired with `/admin/add-event` page).
 
 ### Database (`supabase/migrations/`)
-Plain numbered SQL migration files (`001_align_schema.sql` → `005_event_description.sql`), no
+Plain numbered SQL migration files (`001_align_schema.sql` → `006_venue_model_phase2.sql`), no
 migration tool/CLI wired up — apply them manually against the Supabase project in order. Key
 tables: `events`, `venues`, `interactions`, `subscribers`, `visits`.
 
@@ -145,6 +149,7 @@ tables: `events`, `venues`, `interactions`, `subscribers`, `visits`.
 
 ### Docs (`docs/`)
 Product/strategy docs, not API references — read before large feature work in that area:
-`ROADMAP.md` (status of planned work, what's next and why), `VENUE_MODEL.md` (source-vs-venue
-data model, Phase 1 done / Phase 2 planned), `MONETIZATION.md` / `MONETIZATION_AND_GROWTH.md`,
-`PERSONALIZATION.md` (tiering plan), `DISTRIBUTION.md`, `LAUNCH_AND_LEGAL.md`.
+`ROADMAP.md` (status of planned work, what's next and why), `MONETIZATION.md` /
+`MONETIZATION_AND_GROWTH.md`, `PERSONALIZATION.md` (tiering plan), `DISTRIBUTION.md`,
+`LAUNCH_AND_LEGAL.md`. Feature specs (e.g. `VENUE_MODEL.md`, source-vs-venue data model, Phases
+1 and 2 done) live in `.claude/specs/`.

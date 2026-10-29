@@ -5,7 +5,7 @@ event** (the *source*) with **where the event actually happens** (the *venue*).
 This is the source of several UX problems (misleading card labels, a few
 sources dominating the feed, a confusing venue filter).
 
-**Status:** Phase 1 ✅ (this change) · Phase 2 🔜 (planned, needs a migration)
+**Status:** Phase 1 ✅ · Phase 2 ✅ (migration `006_venue_model_phase2.sql` + scraper write path)
 
 ---
 
