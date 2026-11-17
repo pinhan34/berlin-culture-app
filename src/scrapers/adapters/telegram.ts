@@ -502,7 +502,7 @@ export class TelegramGroupAdapter implements WebsiteAdapter {
                 const text = msg.message ?? '';
                 if (text.length < 10) continue;
 
-                const event = this.extractEvent(text, `telegram:${slugify(groupName)}`);
+                const event = this.extractEvent(text, `telegram:${slugify(groupName)}`, new Date(msg.date * 1000));
                 if (!event) continue;
 
                 const key = `${event.title}|${event.start_time}`;
@@ -559,8 +559,8 @@ export class TelegramGroupAdapter implements WebsiteAdapter {
         return enriched;
     }
 
-    private extractEvent(text: string, source: string): NormalizedEvent | null {
-        const date = this.parseDate(text);
+    private extractEvent(text: string, source: string, postedAt: Date): NormalizedEvent | null {
+        const date = this.parseDate(text,postedAt);
         if (!date) return null;
 
         const hasUrl = URL_RE.test(text);
@@ -586,6 +586,11 @@ export class TelegramGroupAdapter implements WebsiteAdapter {
             if (isNaN(d.getTime())) return null;
             // Only keep future events
             if (d.getTime() < Date.now()) return null;
+            // Sanity window around the post date: an event before the post (1-day grace for
+            // time zones) or more than ~6 months after it is almost always a wrong year guess.
+            const DAY_MS = 24 * 60 * 60 * 1000;
+            if (d.getTime() < postedAt.getTime() - DAY_MS) return null;
+            if (d.getTime() > postedAt.getTime() + 183 * DAY_MS) return null;
             startTime = d.toISOString();
         } catch {
             return null;
@@ -630,8 +635,8 @@ export class TelegramGroupAdapter implements WebsiteAdapter {
      * in which case assume next year (handles posts written in late December
      * about January events).
      */
-    private inferYear(month: number, day: number): string {
-        const now = new Date();
+    private inferYear(month: number, day: number, postedAt: Date): string {
+        const now = new Date(postedAt.getTime());
         const candidate = new Date(now.getFullYear(), month - 1, day);
         if (candidate.getTime() < now.getTime() - 2 * 24 * 60 * 60 * 1000) {
             return String(now.getFullYear() + 1);
@@ -639,7 +644,7 @@ export class TelegramGroupAdapter implements WebsiteAdapter {
         return String(now.getFullYear());
     }
 
-    private parseDate(text: string): ParsedDate | null {
+    private parseDate(text: string, postedAt: Date): ParsedDate | null {
         // ISO: 2026-05-24
         const isoMatch = text.match(ISO_DATE_RE);
         if (isoMatch) {
@@ -697,7 +702,7 @@ export class TelegramGroupAdapter implements WebsiteAdapter {
                 return {
                     day: String(day).padStart(2, '0'),
                     month,
-                    year: this.inferYear(Number(month), day),
+                    year: this.inferYear(Number(month), day,postedAt),
                 };
             }
         }
@@ -711,7 +716,7 @@ export class TelegramGroupAdapter implements WebsiteAdapter {
                 return {
                     day: String(day).padStart(2, '0'),
                     month,
-                    year: this.inferYear(Number(month), day),
+                    year: this.inferYear(Number(month), day,postedAt),
                 };
             }
         }
@@ -725,7 +730,7 @@ export class TelegramGroupAdapter implements WebsiteAdapter {
                 return {
                     day: String(day).padStart(2, '0'),
                     month: String(month).padStart(2, '0'),
-                    year: this.inferYear(month, day),
+                    year: this.inferYear(month, day,postedAt),
                 };
             }
         }
@@ -734,7 +739,7 @@ export class TelegramGroupAdapter implements WebsiteAdapter {
         const relMatch = text.match(RELATIVE_DAY_RE);
         if (relMatch) {
             const word = (relMatch[1] ?? '').toLowerCase();
-            const d = new Date();
+            const d = new Date(postedAt.getTime());
             if (word === 'morgen' || word === 'tomorrow') d.setDate(d.getDate() + 1);
             else if (word === 'übermorgen') d.setDate(d.getDate() + 2);
             return {
@@ -750,7 +755,7 @@ export class TelegramGroupAdapter implements WebsiteAdapter {
             const dayName = (weekdayMatch[1] ?? '').toLowerCase();
             const targetDay = GERMAN_DAYS[dayName] ?? ENGLISH_DAYS[dayName];
             if (targetDay !== undefined) {
-                const d = new Date();
+                const d = new Date(postedAt.getTime());
                 const currentDay = d.getDay();
                 let daysAhead = targetDay - currentDay;
                 if (daysAhead <= 0) daysAhead += 7;

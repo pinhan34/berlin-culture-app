@@ -44,7 +44,7 @@ them.
 ```
 npm run scrape              # run the full orchestrator (src/scrapers/runner.ts) — all adapters, sequential
 npm run scrape:telegram     # run only the Telegram adapter (src/scrapers/testAdapters.ts telegram)
-npm test                    # venueKey, meetupVenue, meetupHttp, villageVenue tests (src/scrapers/*.test.ts)
+npm test                    # venueKey, meetupVenue, meetupHttp, villageVenue, telegramDates tests (src/scrapers/*.test.ts)
 npm run format              # prettier --write .
 npm run format:check        # prettier --check .
 ```
