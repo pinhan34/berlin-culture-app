@@ -3,15 +3,20 @@
 Follow-up to `HOME_UPCOMING_AND_FILTERS.md` (implemented). "This week" and the collapsed
 Filters button fixed the top of the page, but the page as a whole is still crowded.
 
-**Status:** Draft v1, for review in a later session. Nothing here is implemented, and the
-decisions below are recommendations to confirm before a plan is written.
+**Status:** Draft v2. Order of blocks agreed (see "Proposed structure"); nothing implemented
+yet. Remaining decisions are recommendations to confirm before a plan is written.
 
 ---
 
 ## Why
-
 After the previous change, a visitor scrolls through, top to bottom:
+- Header: title, "Hand-picked from Berlin's best indie + queer + ND-friendly spaces…"
+  (`page.tsx`)
+- **Your shortcut to the Berlin worth showing up for**: four-point explainer (`HowItWorks`)
+- **Where we look**: strip of every followed venue (`VenueStrip`)
+- **Trending**: only once interaction data exists (`TrendingStrip`)
 1. "Updated N ago"
+
 2. **This week** (shared, first 8 of the next 7 days)
 3. **Filters** button, then active-filter chips and the hidden-events notice
 4. **Surprise me**: a large animated gradient button (`SurpriseMe`, `QuickPicks`, `CalendarSubscribe`)
@@ -21,7 +26,14 @@ After the previous change, a visitor scrolls through, top to bottom:
 
 Problems:
 - **Repetition.** One event can appear up to four times (This week, For you, Just added,
-  Browse). Nothing dedupes across blocks.
+    Browse). Nothing dedupes across blocks.
+- **The same message, three times, before any event.** The header subtitle, `HowItWorks`
+  ("Hand-picked… from SO36 to Sinema Transtopia") and `VenueStrip` all say "we follow
+  these venues". The venues also appear in Filters and on `/venues`.
+- **"Just added" means new to the database, not new to the visitor.** It shows events
+  scraped in the last 48 h (`NEW_WINDOW_HOURS`), often the same ones as "This week", and
+  tells a returning visitor nothing about what changed since they last came.
+
 - **No hierarchy.** Every block has a headline-sized heading and its own grid, and the
   Surprise button is the loudest element on the page although it is a side feature.
 - **"Browse everything" has no defined edge.** It is not a 1-year list by design. It is
@@ -60,13 +72,15 @@ must not compete with them visually.
 
 ---
 
-## Proposed structure
+## Agreed order:
+1. Header, short, with a one-line **"How it works ›"** that expands (see D8)
+2. "Updated N ago" (unchanged)
+3. **This week** (hero, unchanged logic)
+4. **Filters** bar + chips + hidden notice (unchanged; Surprise me moves in, see D3)
+5. **New since your last visit**: only if there is something (see D9)
+6. **All upcoming**, filtered: the rest, after this week and deduped (see D4, D5)
+7. Bottom: **Where we look** (or a single link to `/venues`) and the newsletter (see D8)
 
-1. "Updated N ago" (unchanged)
-2. **This week** (hero, unchanged logic)
-3. **Filters** bar + chips + hidden notice (unchanged; Surprise me moves in, see D3)
-4. **New & for you**: one compact row (see D2)
-5. **Later**: the rest of "Browse everything", after this week and deduped (see D4, D5)
 
 ## Decisions
 
@@ -81,6 +95,9 @@ Each has a recommendation. Change any and the rest adapts.
 | D5 | What is "Browse everything" now? | Rename to **"Later"**; it starts after the "This week" window, is grouped by **week or month**, and loads in steps ("Show more") instead of one endless list. The days covered by "This week" are not repeated. |
 | D6 | How far ahead does the list reach? | **Make it explicit.** Replace the implicit 500-row cut-off with a named constant and a documented horizon (candidates: 90 days, or "the rest of the season"), applied in the query. Decide together with the 500-limit issue below. |
 | D7 | Behaviour when filters are active | The filtered result replaces "Later" (as today, it filters the full pool); "This week" and the "New & for you" row stay unfiltered. Clarify in the UI that the list below is filtered. |
+| D8 | Top-of-page panels | **Agreed.** Collapse `HowItWorks` into a one-line "How it works ›" toggle under the header (closed by default). Move `VenueStrip` to the bottom, or replace it with one link ("See the places we follow ›" → `/venues`). "This week" becomes the first content block. |
+| D9 | What "Just added" means | **Agreed: "New since your last visit."** Store the visitor's last-visit time on their device (localStorage, no account). Show only events with `created_at` after it, minus anything already in "This week". Heading says when: "5 new since Tuesday". Hidden when empty. First-time visitors: hidden (everything is new to them). Replaces the "fresh" half of D2. |
+
 
 ## The 500-row limit (decide with D6)
 
@@ -122,6 +139,9 @@ Recommendation: A now, C only if the horizon has to be long.
 3. Horizon for "Later" (D6): 90 days, longer, or paginated?
 4. Should Surprise me live beside Filters, or move lower down (D3)?
 5. Should the "Later" list group by week or by month (D5)?
+6. Where does **Trending** go once it has data: above "This week", below it, or merged into
+   the "New since your last visit" row?
+
 
 ## Risks
 
