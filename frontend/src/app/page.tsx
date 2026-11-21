@@ -1,4 +1,3 @@
-import { createClient } from '@supabase/supabase-js';
 import { EventFeed } from '@/components/EventFeed';
 import { VenueStrip } from '@/components/VenueStrip';
 import { HowItWorks } from '@/components/HowItWorks';
@@ -8,6 +7,7 @@ import { TrendingStrip } from '@/components/TrendingStrip';
 import type { Event, Venue } from '@/lib/types';
 import { SITE_URL, SITE_NAME } from '@/lib/site';
 import { getTrendingScores } from '@/lib/trendingServer';
+import { fetchAllUpcomingEvents,fetchVenues } from '@/lib/eventsServer';
 
 export const revalidate = 60; // ISR: refresh data every 60 seconds
 
@@ -49,38 +49,10 @@ function buildEventsJsonLd(events: Event[]) {
 }
 
 async function getData(): Promise<{ events: Event[]; venues: Venue[] }> {
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  );
-
-  const now = new Date().toISOString();
-
-  // venue_id 4 (neurodivergent-berlin.com) is retired — MeetUp (id 2) covers the same
-  // community with better data quality. Old DB rows are excluded here until they expire.
-  const RETIRED_VENUE_IDS = [4];
-
-  const [eventsRes, venuesRes] = await Promise.all([
-    supabase
-      .from('events')
-      .select('*, venue:venues(*)')
-      .gte('start_time', now)
-      .not('venue_id', 'in', `(${RETIRED_VENUE_IDS.join(',')})`)
-      .order('start_time', { ascending: true })
-      .limit(500),
-    supabase
-      .from('venues')
-      .select('*')
-      .not('id', 'in', `(${RETIRED_VENUE_IDS.join(',')})`)
-      .order('name', { ascending: true }),
+  const [events, venues] = await Promise.all([
+    fetchAllUpcomingEvents(),
+    fetchVenues(),
   ]);
-
-  const events: Event[] = (eventsRes.data ?? []).map((row: any) => ({
-    ...row,
-    venue: row.venue ?? undefined,
-  }));
-
-  const venues: Venue[] = venuesRes.data ?? [];
 
   return { events, venues };
 }

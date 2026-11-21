@@ -21,6 +21,17 @@ import { ThisWeek } from './ThisWeek';
 import { FiltersPanel } from './FiltersPanel';
 import { ThisWeekSkeleton } from './Skeletons';
 import { getThisWeek } from '@/lib/thisWeek';
+import {
+  getDateWindow,
+  dateRangeLabel,
+  timeAgo,
+  groupByDate,
+  venueBucketKey,
+  interleaveByVenue,
+  isQualityEvent,
+  VENUE_DISPLAY_CAP,
+  VENUE_CAP_OVERRIDES,
+} from '@/lib/feed';
 import { MoodTiles } from './MoodTiles';
 import { CommunityLanes } from './CommunityLanes';
 import { CalendarSubscribe } from './CalendarSubscribe';
@@ -48,151 +59,6 @@ const VALID_VIBES = new Set<Vibe>(VIBE_DEFS.map(d => d.vibe));
 const TASTE_THRESHOLD = 3;
 /** Max cards shown in the "For you" row. */
 const FOR_YOU_LIMIT = 6;
-
-function timeAgo(ms: number): string {
-  const diffMin = Math.floor((Date.now() - ms) / 60_000);
-  if (diffMin < 1) return 'just now';
-  if (diffMin < 60) return `${diffMin} min${diffMin !== 1 ? 's' : ''} ago`;
-  const diffH = Math.floor(diffMin / 60);
-  if (diffH < 24) return `${diffH} hour${diffH !== 1 ? 's' : ''} ago`;
-  const diffD = Math.floor(diffH / 24);
-  return `${diffD} day${diffD !== 1 ? 's' : ''} ago`;
-}
-
-function startOfDay(d: Date): Date { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; }
-function endOfDay(d: Date): Date { const x = new Date(d); x.setHours(23, 59, 59, 999); return x; }
-
-/**
- * Resolve a date filter value into a [start, end] window (ms). Supports presets
- * (today / tomorrow / weekend / week / month / all) plus a specific YYYY-MM-DD.
- */
-function getDateWindow(range: string): { start: number; end: number } {
-  const now = new Date();
-  const FAR = new Date(9999, 11, 31).getTime();
-  switch (range) {
-    case 'today':
-      return { start: now.getTime(), end: endOfDay(now).getTime() };
-    case 'tomorrow': {
-      const t = startOfDay(now); t.setDate(t.getDate() + 1);
-      return { start: t.getTime(), end: endOfDay(t).getTime() };
-    }
-    case 'weekend': {
-      const day = now.getDay(); // 0 Sun .. 6 Sat
-      const sat = startOfDay(now);
-      sat.setDate(sat.getDate() + ((6 - day + 7) % 7));
-      const sun = new Date(sat); sun.setDate(sun.getDate() + 1);
-      const start = (day === 0 || day === 6) ? now.getTime() : sat.getTime();
-      return { start, end: endOfDay(sun).getTime() };
-    }
-    case 'week': {
-      const end = endOfDay(now); end.setDate(end.getDate() + (7 - now.getDay()));
-      return { start: now.getTime(), end: end.getTime() };
-    }
-    case 'month':
-      return { start: now.getTime(), end: new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999).getTime() };
-    case 'all':
-      return { start: 0, end: FAR };
-    default: {
-      const d = new Date(`${range}T00:00:00`);
-      if (!Number.isNaN(d.getTime())) return { start: startOfDay(d).getTime(), end: endOfDay(d).getTime() };
-      return { start: 0, end: FAR };
-    }
-  }
-}
-
-function dateRangeLabel(range: string): string {
-  switch (range) {
-    case 'today': return 'Today';
-    case 'tomorrow': return 'Tomorrow';
-    case 'weekend': return 'This weekend';
-    case 'week': return 'This week';
-    case 'month': return 'This month';
-    case 'all': return 'All upcoming';
-    default: {
-      const d = new Date(`${range}T00:00:00`);
-      return Number.isNaN(d.getTime())
-        ? 'All upcoming'
-        : d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
-    }
-  }
-}
-
-const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-
-function formatDateHeading(d: Date): string {
-  return `${WEEKDAYS[d.getDay()]}, ${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
-}
-
-function groupByDate(events: Event[]): Map<string, Event[]> {
-  const groups = new Map<string, Event[]>();
-  for (const event of events) {
-    const key = formatDateHeading(new Date(event.start_time));
-    const arr = groups.get(key) ?? [];
-    arr.push(event);
-    groups.set(key, arr);
-  }
-  return groups;
-}
-
-/**
- * Grouping key for per-venue capping/interleaving. Once an event has a
- * populated venue_key (Phase 2 — real venue parsed/fetched at scrape time),
- * bucket on that so events at different real venues inside one aggregator
- * are diversified individually. Falls back to the raw venue_id (today's
- * per-source behavior) for any row without one yet.
- */
-function venueBucketKey(e: Event): string {
-  return e.venue_key ?? `id:${e.venue_id}`;
-}
-
-/**
- * Round-robin across *venues* within a single day so no single high-volume
- * source (Village Berlin, Telegram) dominates the top of the list.
- */
-function interleaveByVenue(dayEvents: Event[]): Event[] {
-  const buckets = new Map<string, Event[]>();
-  for (const e of dayEvents) {
-    const key = venueBucketKey(e);
-    const arr = buckets.get(key) ?? [];
-    arr.push(e);
-    buckets.set(key, arr);
-  }
-  const queues = [...buckets.values()];
-  const result: Event[] = [];
-  while (queues.some(q => q.length > 0)) {
-    for (const queue of queues) {
-      const item = queue.shift();
-      if (item) result.push(item);
-    }
-  }
-  return result;
-}
-
-/** Fix 2 — max events shown per venue in the default (unfiltered) view. */
-const VENUE_DISPLAY_CAP = 30;
-
-/** Telegram venue id — events without a real external URL are excluded. */
-const TELEGRAM_VENUE_ID = 7;
-
-/**
- * Per-source display caps (Phase 1 — tame feed domination; see docs/VENUE_MODEL.md).
- * High-volume aggregators (Telegram, Village, MeetUp) get tighter caps so they
- * don't crowd out brick-and-mortar venues. Phase 2 moves this to per-real-venue.
- */
-const VENUE_CAP_OVERRIDES: Record<number, number> = {
-  1: 15, // Sinema Transtopia — many screenings, keep balanced with gallery events
-  2: 12, // MeetUp Groups (aggregator)
-  3: 12, // Village Berlin (aggregator / reposts a lot)
-  7: 12, // Telegram — QUEER EVENTS Berlin (aggregator)
-  8: 18, // ART at Berlin (gallery aggregator, but exhibitions are valuable)
-};
-
-function isQualityEvent(e: Event): boolean {
-  // Block stale t.me fallback URLs left in the DB from before the enrichment fix
-  if (e.event_url?.startsWith('https://t.me/')) return false;
-  return true;
-}
 
 export function EventFeed({ events, venues }: Props) {
   // Persisted filter preferences — survive page reload

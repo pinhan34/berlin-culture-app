@@ -9,6 +9,8 @@ communities into a Supabase database, then serves them through a Next.js fronten
 personalized recommendations. Two first-class discovery lanes: **Queer Berlin** and
 **Neurodivergent** communities.
 
+Visitors should feel safe and have fun finding their way around.
+
 The repo has two independent npm projects that share only a Supabase database:
 
 - **root** (`/`) — TypeScript scraper pipeline (Playwright-based adapters + a Supabase-writing

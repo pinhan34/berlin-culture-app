@@ -4,12 +4,62 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
-import type { Event } from './types';
+import type { Event, Venue } from './types';
 import { isAggregatorVenue, isSelfVenueKey } from './venueCategories';
 
-// venue_id 4 (neurodivergent-berlin.com) is retired — MeetUp (id 2) covers it with
-// better data. Kept in sync with the homepage query in app/page.tsx.
+// Every feed query in this file filters it out..
 const RETIRED_VENUE_IDS = [4];
+
+/** Rows per request. Supabase returns at most 1000 rows per request by default. */
+const PAGE_SIZE = 1000;
+
+/**
+ * Every upcoming event, soonest first, with no cap. Fetched in chunks of PAGE_SIZE
+ * so nothing is silently cut off (the old homepage query stopped at 500).
+ * Filters and taste chips run on the visitor's device and need the whole pool.
+ */
+export async function fetchAllUpcomingEvents(): Promise<Event[]> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !anon) return [];
+
+  const supabase = createClient(url, anon);
+  const now = new Date().toISOString();
+  const events: Event[] = [];
+
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from('events')
+      .select('*, venue:venues(*)')
+      .gte('start_time', now)
+      .not('venue_id', 'in', `(${RETIRED_VENUE_IDS.join(',')})`)
+      .order('start_time', { ascending: true })
+      .order('id', { ascending: true }) // stable order, so chunks never overlap or skip
+      .range(from, from + PAGE_SIZE - 1);
+
+    if (error || !data) break;
+    for (const row of data as Event[]) events.push({ ...row, venue: row.venue ?? undefined });
+    if (data.length < PAGE_SIZE) break;
+  }
+
+  return events;
+}
+
+export async function fetchVenues(): Promise<Venue[]> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !anon) return [];
+
+  const supabase = createClient(url, anon);
+  const { data, error } = await supabase
+    .from('venues')
+    .select('*')
+    .not('id', 'in', `(${RETIRED_VENUE_IDS.join(',')})`)
+    .order('name', { ascending: true });
+
+  if (error || !data) return [];
+  return data as Venue[];
+}
 
 /** Upcoming events whose start falls within [startISO, endISO), soonest first. */
 export async function fetchEventsInRange(
@@ -33,7 +83,7 @@ export async function fetchEventsInRange(
 
   if (error) return [];
 
-  return (data ?? []).map((row: any) => ({ ...row, venue: row.venue ?? undefined }));
+  return (data ?? []).map((row: Event) => ({ ...row, venue: row.venue ?? undefined }));
 }
 
 export interface VenueSummary {
